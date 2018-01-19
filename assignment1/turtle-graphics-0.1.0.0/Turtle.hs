@@ -18,48 +18,72 @@ module Turtle (
 
   ) where
 
+data Program = Prog (Turtle -> ([Turtle], Maybe Turtle))
+data Turtle = Tur Vector Vector Pen
+data Vector = Vec {x, y :: Double}
+data Pen = Pen {drawing :: Bool, col :: Int}
 -- | Description of your type here...
 --
---   You can use newtype instead of data if you wish.
-data Program =
-  P {
-    drawing :: Bool,
-    moves :: [Move]
-  }
+--   You can urt newtype instead of data if you wish.
 
-data Move = T Double | M Double
-{-
-drawingturtle ::    Program
-movingnotdrawing :: Program
-resting ::          Program
-dead ::             Program
--}
-die :: Program -> Program
-die _ = P {false, []}
-
-idle :: Program -> Program
-idle p = resting >*> p
-
-penup :: Program -> Program
-
-pendown :: Program -> Program
-
-forward :: Double -> Program
-
-backward :: Double -> Program
+-- Constructors --
 
 right :: Double -> Program
+right d = Prog $ \(Tur pos dir pen) -> ([], Just (Tur pos (rotateRight d dir) pen))
+
+forward :: Double -> Program
+forward d = Prog $ \(Tur pos dir pen) -> ([], Just (Tur (pos +++ dir *** d) dir pen))
+
+penup :: Program
+penup = Prog $ penstat
+  where penstat (Tur pos dir pen) = ([], Just turk)
+          where turk = (Tur pos dir pen{drawing = False})
+
+pendown :: Program 
+pendown = Prog $ penstat
+  where penstat (Tur pos dir pen) = ([], Just turk)
+          where turk = (Tur pos dir pen{drawing = True}) 
+
+color :: Int -> Program
+color i = Prog $ newCol
+  where newCol (Tur pos dir pen) = ([], Just turk)
+          where turk = (Tur pos dir pen{col = i}) 
+
+die :: Program
+die = Prog $ \t -> ([], Nothing)
+
+
+-- Combinators --
+
+(>*>) :: Program -> Program -> Program
+Prog p >*> Prog p' = Prog $ \t -> 
+    case p t of
+      (ts, Just t') -> let (ts', t'') = p' t'
+                        in (ts ++ t': ts', t'')
+      rest -> rest
+
+
+idle :: Program
+idle = Prog $ \t -> ([], Just t)
+
+backward :: Double -> Program 
+backward = forward . negate
 
 left :: Double -> Program 
+left = right . negate
 
-times :: Int -> Program
+-- Vector and matrix ops --
 
-color :: Program -> Program
+rotateRight :: Double -> Vector -> Vector
+rotateRight d dir = undefined
 
-limited :: Program -> Program
+(+++) :: Vector -> Vector -> Vector
+(Vec x y) +++ (Vec x' y') = (Vec (x + x') (y + y'))  
 
-lifespan :: Program -> Program
+(***) :: Vector -> Double -> Vector
+(Vec x y) *** d = (Vec (x*d) (y*d))
 
-forever :: Program -> Program
+infixl 5 ***
+infixl 3 +++ 
 
-_>*>_ :: Program -> Program -> Program -- take two programs or take some kind of "action"?
+
