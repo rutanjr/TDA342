@@ -30,7 +30,6 @@ data Turtle = T Pos Dir Pen
 --   You can use newtype instead of data if you wish.
 newtype Program = P (Turtle -> Turtle) -- ?
 
-
 -- * Constructors
 forward  :: Double -> Program
 right    :: Double -> Program
@@ -42,8 +41,6 @@ die      :: Program
 -- * Combinators
 (>*>)    :: Program -> Program -> Program
 limited  :: Int -> Program -> Program
-lifespan :: Int -> Program -> Program
-times    :: Int -> Program -> Program
 
 -- * Derived Combinators
 idle :: Program -- could be implemented as "forward 0" for example
@@ -57,6 +54,12 @@ left = right . negate
 
 forever  :: Program -> Program
 forever p = p >*> forever p
+
+times :: Int -> Program -> Program
+times n = limited n . forever
+
+lifespan :: Int -> Program -> Program
+lifespan n p = limited n p >*> die
 
 -- * Run function
 runTextual :: Program -> IO ()
