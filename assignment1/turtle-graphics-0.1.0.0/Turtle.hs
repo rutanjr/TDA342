@@ -1,89 +1,90 @@
--- | proper module documentation here
+{- |
+Module      : Turtle
+Description : 
+-}
 module Turtle (
   -- * The turtle type(s)
   -- Non-exhaustive list of possible types: Turtle, Program, Action, Operation ...
-  Program
-
+  Program, Action
   -- * Primitive operations
-  -- , forward
-  -- , (>*>)
-  -- , ...
-
+  , forward
+  , right
+  , penup
+  , pendown
+  , color
+  , (>*>)
+  , die
+  , limited
   -- * Derived operations
-  -- ...
+  , forever
+  , times
+  , idle
+  , lifespan
+  , backward
+  , left
 
   -- * Run functions
-  -- runTextual :: Program -> IO ()
-  -- ...
+  , runTextual
 
   ) where
 
-data Program = Prog (Turtle -> ([Turtle], Maybe Turtle))
-data Turtle = Tur Vector Vector Pen
-data Vector = Vec {x, y :: Double}
-data Pen = Pen {drawing :: Bool, col :: Int}
--- | Description of your type here...
---
---   You can urt newtype instead of data if you wish.
+type Vector = (Double,Double)
+type Line   = (Pos,Pos,Maybe Color)
+type Pos    = Vector
+type Dir    = Vector
+type Color  = Int --placeholder
 
--- Constructors --
+data Pen    = Pen Bool Color
+data Turtle = T Pos Dir Pen
+data Action
+  = Act Line   -- ^ The constructor 'Act' for an action resulting in a line
+  | Msg String -- ^ Constructor for turtle actions not resulting in lines
 
-right :: Double -> Program
-right d = Prog $ \(Tur pos dir pen) -> ([], Just (Tur pos (rotateRight d dir) pen))
+-- | A program is a function which takes a Turtle and returns a list of actions
+-- performed and maybe a turtle depending on its survival.
+newtype Program = P (Turtle -> ([Action],Maybe Turtle)) -- ?
 
+-- * Constructors
 forward :: Double -> Program
-forward d = Prog $ \(Tur pos dir pen) -> ([], Just (Tur (pos +++ dir *** d) dir pen))
+right   :: Double -> Program
+penup   :: Program
+pendown :: Program
+color   :: Program
+die     :: Program
 
-penup :: Program
-penup = Prog $ penstat
-  where penstat (Tur pos dir pen) = ([], Just turk)
-          where turk = (Tur pos dir pen{drawing = False})
+-- * Combinators
+(>*>)   :: Program -> Program -> Program
+limited :: Int -> Program -> Program
 
-pendown :: Program 
-pendown = Prog $ penstat
-  where penstat (Tur pos dir pen) = ([], Just turk)
-          where turk = (Tur pos dir pen{drawing = True}) 
-
-color :: Int -> Program
-color i = Prog $ newCol
-  where newCol (Tur pos dir pen) = ([], Just turk)
-          where turk = (Tur pos dir pen{col = i}) 
-
-die :: Program
-die = Prog $ \t -> ([], Nothing)
-
-
--- Combinators --
-
-(>*>) :: Program -> Program -> Program
-Prog p >*> Prog p' = Prog $ \t -> 
-    case p t of
-      (ts, Just t') -> let (ts', t'') = p' t'
-                        in (ts ++ t': ts', t'')
-      rest -> rest
-
-
+-- * Derived Combinators
 idle :: Program
-idle = Prog $ \t -> ([], Just t)
+idle = right 0
 
-backward :: Double -> Program 
+backward :: Double -> Program
 backward = forward . negate
 
-left :: Double -> Program 
+left :: Double -> Program
 left = right . negate
 
--- Vector and matrix ops --
+forever  :: Program -> Program
+forever p = p >*> forever p
 
-rotateRight :: Double -> Vector -> Vector
-rotateRight d dir = undefined
+times :: Int -> Program -> Program
+times n = limited n . forever
 
-(+++) :: Vector -> Vector -> Vector
-(Vec x y) +++ (Vec x' y') = (Vec (x + x') (y + y'))  
+lifespan :: Int -> Program -> Program
+lifespan n p = limited n p >*> die
 
-(***) :: Vector -> Double -> Vector
-(Vec x y) *** d = (Vec (x*d) (y*d))
+-- * Run function
+runTextual :: Program -> IO ()
+runTextual = undefined
 
-infixl 5 ***
-infixl 3 +++ 
-
-
+-- * Temporary undefined implementation
+forward = undefined
+right   = undefined
+penup   = undefined
+pendown = undefined
+color   = undefined
+die     = undefined
+limited = undefined
+(>*>)   = undefined
