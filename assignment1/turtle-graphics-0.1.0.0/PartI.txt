@@ -1,0 +1,3 @@
+Task 3
+
+Q1: It is possible to define the limited Spiral programs in terms of an unlimited one. As can be seen in the file 'TurtleSpiral.hs' the function spiralFinInf uses an infinite spiral and the 'limited' combinator to achieve this.

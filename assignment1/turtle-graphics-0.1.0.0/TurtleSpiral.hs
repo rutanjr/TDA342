@@ -1,7 +1,15 @@
--- | 
-module TurtleSpiral where
+{- |
+Module      : TurtleSpiral
+Description : A small module containing functions to create turtle programs generating spirals.
+-}
+module TurtleSpiral (
+    spiralFin
+  , spiralInf
+  , spiralFin'
+  , spiralFinInf  
+  ) where
 
-import Turtle1
+import Turtle
 
 -- | A finite spiral turning d radians each step and stopping at 100 steps
 spiralFin :: Double -> Double -> Program
@@ -14,9 +22,11 @@ spiralInf s d = forward s >*> right d >*> spiralInf (s + 2) d
 
 -- | An alternate definition of spiralFin using spiralInf
 spiralFin' :: Double -> Double -> Program
-spiralFin' s d = limited (102 - s `div` 2) $ spiralInf s d
+spiralFin' s d = limited (102 - (fromEnum s `div` 2)) $ spiralInf s d
 
 -- | An infinite spiral program starting with a finite spiral and then an
 -- infinite spiral continuing where the finite ends
 spiralFinInf :: Double -> Double -> Program
 spiralFinInf s d = spiralFin s d >*> spiralInf 102 d
+
+
