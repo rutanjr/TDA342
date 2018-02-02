@@ -15,6 +15,7 @@ module Turtle (
   , pendown
   , color
   , (>*>)
+  , (<|>)
   , die
   , limited
   -- * Derived operations
@@ -24,7 +25,6 @@ module Turtle (
   , lifespan
   , backward
   , left
-
   -- * Run functions
   , runTextual
 
@@ -42,20 +42,51 @@ data Action
   = Act Line   -- ^ The constructor 'Act' for an action resulting in a line
   | Msg String -- ^ Constructor for turtle actions not resulting in lines
 
+-- * Linear algebra and stuff
+--------------------------------------------------------------------------------
+
+-- | Vector addition
+(+++) :: Vector -> Vector -> Vector
+(x,y) +++ (u,v) = (x+u,y+v)
+
+(***) :: Double -> Vector -> Vector
+d *** (x,y) = (d*x,d*y)
+
+-- | Rotate vector, basically matrix multiplication with 2d rotation matrix
+rotate :: Double -> Vector -> Vector
+rotate d (x,y) = (cos d * x + sin d * y, cos d * y - sin d * x)
+
+-- * Turtle data type and functions
+--------------------------------------------------------------------------------
+
 -- | A program is a function which takes a Turtle and returns a list of actions
 -- performed and maybe a turtle, depending on its survival.
-newtype Program = P (Turtle -> ([Action],Maybe Turtle))
+newtype Program = P (Turtle -> Int -> ([(Int,Action)],Maybe Turtle))
 
 -- * Constructors
+
+-- | Moves turtle a distance 'd' in the direction it is facing 
 forward :: Double -> Program
-right   :: Double -> Program
+forward d = P $ \(T pos dir pen) n ->
+  ([(n+1,Msg ("forward " ++ show d))], Just $ T (pos +++ (d *** dir)) dir pen)
+
+-- | Rotates turtle 'd' radians
+right :: Double -> Program
+right d = P $ \(T pos dir pen) n ->
+  ([(n+1,Msg ("turned " ++ show d ++ " radians"))],
+   Just $ T pos (rotate d dir) pen)
+
 penup   :: Program
 pendown :: Program
 color   :: Program
 die     :: Program
 
 -- * Combinators
-(>*>)   :: Program -> Program -> Program  
+(>*>)   :: Program -> Program -> Program
+
+(<|>)   :: Program -> Program -> Program
+(<|>) = undefined
+
 limited :: Int -> Program -> Program
 
 -- * Derived Combinators
@@ -82,11 +113,22 @@ runTextual :: Program -> IO ()
 runTextual = undefined
 
 -- * Temporary undefined implementation
-forward = undefined
-right   = undefined
 penup   = undefined
 pendown = undefined
 color   = undefined
 die     = undefined
 limited = undefined
 (>*>)   = undefined
+
+
+-- * Attempt at monad implementation
+--------------------------------------------------------------------------------
+
+-- -- Functor
+-- instance Functor E where
+--    fmap f m = m >>= \a -> return (f a)
+
+-- -- Applicative
+-- instance Applicative E where
+--    pure  = return
+--    (<*>) a_f a_x = a_f >>= \f -> a_x >>= \x -> pure $ f x
