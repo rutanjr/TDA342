@@ -30,6 +30,11 @@ module Turtle (
 
   ) where
 
+-- *
+import GHC.Exts
+import Data.List
+-- * 
+
 type Vector = (Double,Double)
 type Pos    = Vector
 type Dir    = Vector
@@ -52,10 +57,17 @@ data Turtle = Turtle
   , pen :: Pen
   }
 
+initTurtle :: Turtle
+initTurtle = Turtle
+  { pos = (0,0)
+  , dir = (0,1)
+  , pen = Pen True 0
+  }
+
 data Action = Act
-  { counter :: Int
-  , op      :: Operation
-  , turtle  :: Turtle
+  { counter   :: Int
+  , operation :: Operation
+  , turtle    :: Turtle
   }
   
 data Operation
@@ -93,15 +105,17 @@ forward :: Double -> Program
 forward d = P $ \t n ->
   let t' = move d t
       operation | down (pen t) = Op  $ Line (pos t) (pos t') (clr . pen $ t) 
-                | otherwise    = Msg $ "moved " ++ show d ++ " in direction "
-                                                ++ show  (dir t)    
+                | otherwise    = Msg $ "moved from " ++ show (pos t) ++ 
+                                       " to " ++ show (pos t')    
   in ([Act (n+1) operation t'], Just t')
 
 -- | Rotates turtle 'd' radians
 right :: Double -> Program
 right d = P $ \t n ->
   let t' = rotate d t in  ([Act (n+1) msg t'], Just t')
-  where msg = Msg $ "turned " ++ show d ++ " radians"    
+  where msg = if d /= 0
+                then Msg $ "turned " ++ show d ++ " radians"
+                else Msg $ "turtle idle"
 
 -- | Lifts the pen resulting in no drawn lines 
 penup :: Program
@@ -137,23 +151,26 @@ die = P $ \t n -> ([Act (n+1) msg t], Nothing)
 (P p1) >*> (P p2) = P $ \t n -> case p1 t n of
   ([],  Just t1) -> p2 t1 n
   (as1, Just t1) -> let (as2, mt) = p2 t1 $ counter . head $ as1
-                    in  (as2 ++ as1, mt)
+                    in  (as1 ++ as2, mt)
   out            -> out
   
 (<|>) :: Program -> Program -> Program
-(P p1) <|> (P p2) = undefined
-
+(P p1) <|> (P p2) = P $ \t n ->
+  let (as1,mt1) = p1 t n
+      (as2,mt2) = p2 t n
+      ass1 = groupWith counter as1
+      ass2 = groupWith counter as2
+  in  (concat $ zipWith (++) ass1 ass2, Nothing)
+  
 limited :: Int -> Program -> Program
 limited m (P p) = P $ \t n ->
   let (as,mt) = p t n
-  in  (takeWhile ((<=m+n) . counter) as, )
-
-{-*
-  limited 0 : t -> ([], Just t)
-  limited n : t -> ([t1,...,tm], Maybe tm)
-  forward n >*> limited 0 (forever idle) >*> forward n =?= forward n >*> forward n
--}
-
+  in case takeWhile ((<=m+n) . counter) as of
+       [] -> ([],mt)
+       as -> if (counter . head) as < m
+                then (as, mt)
+                else (as, Just $  turtle . head $ as)
+               
 -- * Derived Combinators
 idle :: Program
 idle = right 0
@@ -174,5 +191,22 @@ lifespan :: Int -> Program -> Program
 lifespan n p = limited n p >*> die
 
 -- * Run function
+--------------------------------------------------------------------------------
+
 runTextual :: Program -> IO ()
-runTextual = undefined
+runTextual (P p) = 
+  let (as,_) = p initTurtle 0
+  in sequence_ $ map (putStrLn . fromAction) as  
+  where fromAction a =
+          case operation a of
+            Msg msg      -> msg
+            Op (Line from to c) -> "drew line from " ++ show from ++
+                                   " to " ++ show to 
+
+-- * Test programs
+--------------------------------------------------------------------------------
+prog_1 = forward 2
+prog_2 = right 0 >*> right 1
+prog_3 = right (pi/2) >*> penup >*> forward 1 >*> pendown >*> forward 1
+prog_forever = forever idle
+prog_not_forever = idle >*> die >*> forever idle
