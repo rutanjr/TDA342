@@ -151,39 +151,40 @@ die = P $ \t n -> ([Act (n+1) msg t], [])
 -- * Combinators
 --------------------------------------------------------------------------------
 
-infixl 9 >*>
-infixl 8 <|>
-
 -- | Sequentialize two turtle programs. The second program will start where the
 -- first one ended.
 (>*>) :: Program -> Program -> Program
 (P p1) >*> (P p2) = P $ \t n -> case p1 t n of
-  (as,[]) -> (as,[])
-  (as1,ts) ->
-    let m = counter . last $ as1
-        os = map (\t -> p2 t m) ts -- ska inte vara 'n'
-        ass = map fst os
-        asss = map (groupWith counter) ass
-        ts' = concat $ map snd os        
-    in (as1 ++ zipActions asss,ts')
+  (as1,[]) -> (as1,[])
+  (as1,ts) -> (as1 ++ sortActions ass,ts')
+    where m = counter . last $ as1
+          os = map (\t -> p2 t m) ts
+          ass = map fst os
+          ass' = []
+          ts' = concat $ map snd os          
+          
+-- * TEST
+-- newtype Program = P (Turtle -> Int -> ([Action],[Turtle]))
 
 -- | Parallel
 (<|>) :: Program -> Program -> Program
 (P p1) <|> (P p2) = P $ \t n ->
   let (as1,ts1) = p1 t n
       (as2,ts2) = p2 t n
-      ass1 = groupWith counter as1
-      ass2 = groupWith counter as2
-  in (zipActions [ass1,ass2], ts1 ++ ts2)
-
-zipActions :: [[[Action]]] -> [Action]
-zipActions []     = []
-zipActions [[]]   = []
-zipActions groups = concat heads ++ zipActions tails
-  where pairs = catMaybes $ map uncons groups
-        heads = map fst pairs
-        tails = map snd pairs
-
+  in (sortActions [as1,as2],ts1 ++ ts2)
+  
+sortActions :: [[Action]] -> [Action]
+sortActions []  = []
+sortActions ass =
+  case ass' of
+    []-> []
+    _ -> let n = counter $ head $ head ass'
+             pairs = map (break ((>n) . counter)) ass'
+             heads = concatMap fst pairs
+             tails = map snd pairs
+         in heads ++ sortActions tails
+  where ass' = filter (not . null) ass
+ 
 -- | Limited
 limited :: Int -> Program -> Program
 limited m (P p) = P $ \t n ->
