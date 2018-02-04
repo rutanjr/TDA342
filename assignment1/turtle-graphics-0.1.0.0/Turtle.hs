@@ -35,7 +35,8 @@ module Turtle (
 -- *
 import GHC.Exts
 import Prelude hiding (lines)
---import Data.List
+import Data.Maybe (catMaybes)
+import Data.List (uncons)
 -- * 
 
 type Vector = (Double,Double)
@@ -99,12 +100,10 @@ rotate d t = t { dir = (cos d * x + sin d * y, cos d * y - sin d * x)}
 
 -- | A program is a function which takes a Turtle and returns a list of actions
 -- performed and maybe a turtle, depending on its survival.
-newtype Program = P (Turtle -> Int -> ([Action],Maybe Turtle))
--- * P = (Turtle -> {Lines})
--- P1 == P2  <=> (t :: Turtle => P1 t == P2 t)
-
+newtype Program = P (Turtle -> Int -> ([Action],[Turtle]))
 
 -- * Constructors
+--------------------------------------------------------------------------------
 
 -- | Moves turtle a distance 'd' in the direction it is facing 
 forward :: Double -> Program
@@ -113,12 +112,12 @@ forward d = P $ \t n ->
       operation | down (pen t) = Op  $ Line (pos t) (pos t') (clr . pen $ t) 
                 | otherwise    = Msg $ "moved from " ++ show (pos t) ++ 
                                        " to " ++ show (pos t')    
-  in ([Act (n+1) operation t'], Just t')
+  in ([Act (n+1) operation t'], [t'])
 
 -- | Rotates turtle 'd' radians
 right :: Double -> Program
 right d = P $ \t n ->
-  let t' = rotate d t in  ([Act (n+1) msg t'], Just t')
+  let t' = rotate d t in  ([Act (n+1) msg t'], [t'])
   where msg = if d /= 0
                 then Msg $ "turned " ++ show d ++ " radians"
                 else Msg $ "turtle idle"
@@ -127,55 +126,73 @@ right d = P $ \t n ->
 penup :: Program
 penup = P $ \t n ->
   let t' = t { pen = (pen t) { down = False}}
-  in  ([Act (n+1) msg t'], Just t')
+  in  ([Act (n+1) msg t'], [t'])
   where msg = Msg "lifted the pen"
 
 -- | Puts the pen down and resumes drawing of lines
 pendown :: Program
 pendown = P $ \t n ->
   let t' = t { pen = (pen t) { down = True}}
-  in  ([Act (n+1) msg t'], Just t')
+  in  ([Act (n+1) msg t'], [t'])
   where msg = Msg "put pen down"
   
 -- | Changes the color of the pen  
 color :: Color -> Program
 color c = P $ \t n -> 
   let t' = t { pen = (pen t) { clr = c}}
-  in  ([Act (n+1) msg t'], Just t')
+  in  ([Act (n+1) msg t'], [t'])
   where msg = Msg $ "changed color to " ++ show c
   
 -- | Kills a turtle rendering it unable to perform more actions
 die :: Program
-die = P $ \t n -> ([Act (n+1) msg t], Nothing)
+die = P $ \t n -> ([Act (n+1) msg t], [])
   where msg = Msg "turtle died :("
 
 -- * Combinators
+--------------------------------------------------------------------------------
+
+infixl 9 >*>
+infixl 8 <|>
 
 -- | Sequentialize two turtle programs. The second program will start where the
--- first one ended. 
+-- first one ended.
 (>*>) :: Program -> Program -> Program
 (P p1) >*> (P p2) = P $ \t n -> case p1 t n of
-  ([],  Just t1) -> p2 t1 n
-  (as1, Just t1) -> let (as2, mt) = p2 t1 $ counter . last $ as1
-                    in  (as1 ++ as2, mt)
-  out            -> out
-  
+  (as,[]) -> (as,[])
+  (as1,ts) ->
+    let m = counter . last $ as1
+        os = map (\t -> p2 t m) ts -- ska inte vara 'n'
+        ass = map fst os
+        asss = map (groupWith counter) ass
+        ts' = concat $ map snd os        
+    in (as1 ++ zipActions asss,ts')
+
+-- | Parallel
 (<|>) :: Program -> Program -> Program
 (P p1) <|> (P p2) = P $ \t n ->
-  let (as1,mt1) = p1 t n
-      (as2,mt2) = p2 t n
+  let (as1,ts1) = p1 t n
+      (as2,ts2) = p2 t n
       ass1 = groupWith counter as1
       ass2 = groupWith counter as2
-  in  (concat $ zipWith (++) ass1 ass2, Nothing)
-  
+  in (zipActions [ass1,ass2], ts1 ++ ts2)
+
+zipActions :: [[[Action]]] -> [Action]
+zipActions []     = []
+zipActions [[]]   = []
+zipActions groups = concat heads ++ zipActions tails
+  where pairs = catMaybes $ map uncons groups
+        heads = map fst pairs
+        tails = map snd pairs
+
+-- | Limited
 limited :: Int -> Program -> Program
 limited m (P p) = P $ \t n ->
-  let (as,mt) = p t n
+  let (as,ts) = p t n
   in case takeWhile ((<=m+n) . counter) as of
-       [] -> ([],mt)
-       as -> if (counter . head) as < m
-                then (as, mt)
-                else (as, Just $  turtle . head $ as)
+       [] -> ([],ts)
+       as' -> let i = (counter . last) as'
+                  ts' = map turtle $ dropWhile ((<i) . counter) as'
+              in (as',ts')
                
 -- * Derived Combinators
 idle :: Program
