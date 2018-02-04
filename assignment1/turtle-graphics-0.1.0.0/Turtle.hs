@@ -7,7 +7,7 @@ The turtle interface provides primiteve, as well as derived, operators for creat
 -}
 module Turtle (
   -- * The turtle types
-  Program, Action, Vector, Line, Pos, Dir
+  Program (P), Action, Vector, Line(from,to), Pos, Dir
   -- * Primitive operations
   , forward
   , right
@@ -27,12 +27,15 @@ module Turtle (
   , left
   -- * Run functions
   , runTextual
+  , runLines
+  , initTurtle
 
   ) where
 
 -- *
 import GHC.Exts
-import Data.List
+import Prelude hiding (lines)
+--import Data.List
 -- * 
 
 type Vector = (Double,Double)
@@ -45,17 +48,19 @@ data Line = Line
   , to      :: Pos
   , lineclr :: Color
   }
+instance Show Line where
+  show l = show (from l) ++ " - " ++ show (to l)
 
 data Pen    = Pen
   { down :: Bool
   , clr  :: Color
-  }
+  } deriving Show
   
 data Turtle = Turtle
   { pos :: Vector
   , dir :: Vector
   , pen :: Pen
-  }
+  } deriving Show
 
 initTurtle :: Turtle
 initTurtle = Turtle
@@ -68,11 +73,12 @@ data Action = Act
   { counter   :: Int
   , operation :: Operation
   , turtle    :: Turtle
-  }
+  } deriving Show
   
 data Operation
   = Op  Line   -- ^ The constructor 'Op' for an action resulting in a line
   | Msg String -- ^ Constructor for turtle actions not resulting in lines
+  deriving Show
 
 -- * Internal functions
 --------------------------------------------------------------------------------
@@ -150,7 +156,7 @@ die = P $ \t n -> ([Act (n+1) msg t], Nothing)
 (>*>) :: Program -> Program -> Program
 (P p1) >*> (P p2) = P $ \t n -> case p1 t n of
   ([],  Just t1) -> p2 t1 n
-  (as1, Just t1) -> let (as2, mt) = p2 t1 $ counter . head $ as1
+  (as1, Just t1) -> let (as2, mt) = p2 t1 $ counter . last $ as1
                     in  (as1 ++ as2, mt)
   out            -> out
   
@@ -197,11 +203,24 @@ runTextual :: Program -> IO ()
 runTextual (P p) = 
   let (as,_) = p initTurtle 0
   in sequence_ $ map (putStrLn . fromAction) as  
-  where fromAction a =
+  where fromAction a = show (counter a) ++ ": " ++ fromOp a
+        fromOp a =
           case operation a of
-            Msg msg      -> msg
+            Msg msg             -> msg
             Op (Line from to c) -> "drew line from " ++ show from ++
                                    " to " ++ show to 
+
+runLines :: Program -> [Line]
+runLines (P p) =
+  let (as,_) = p initTurtle 0
+  in lines as
+
+lines :: [Action] -> [Line]
+lines [] = []
+lines (Act _ op _ : as) = case op of
+  Op l -> l : lines as
+  _    -> lines as
+
 
 -- * Test programs
 --------------------------------------------------------------------------------
@@ -210,3 +229,4 @@ prog_2 = right 0 >*> right 1
 prog_3 = right (pi/2) >*> penup >*> forward 1 >*> pendown >*> forward 1
 prog_forever = forever idle
 prog_not_forever = idle >*> die >*> forever idle
+  
