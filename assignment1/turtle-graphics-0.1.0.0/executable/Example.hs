@@ -2,9 +2,9 @@ module Main where
 
 import TurtleGraphics
 import Turtle
--- import TurtleExtras
+import TurtleExtras
 
 main = runGraphical coolExample
 
-coolExample = undefined
+coolExample = drawMagentaShape 20 20
 

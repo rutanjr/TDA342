@@ -7,7 +7,7 @@ The turtle interface provides primiteve, as well as derived, operators for creat
 -}
 module Turtle (
   -- * The turtle types
-  Program (P), Action, Vector, Line(from,to), Pos, Dir
+  Program (P), Action, Vector, Line(from,to, lineclr), Pos, Dir
   -- * Primitive operations
   , forward
   , right
@@ -32,18 +32,22 @@ module Turtle (
 
   ) where
 
--- *
+
 import GHC.Exts
+import Graphics.HGL hiding (Pen)
 import Prelude hiding (lines)
 import Data.Maybe (catMaybes)
 import Data.List (uncons)
 -- * 
 
+-- | For directions and positions.
 type Vector = (Double,Double)
+-- | Position, contained in line and the turtle itself.
 type Pos    = Vector
+-- | Direction, to keep track of the state the turtle is in.
 type Dir    = Vector
-type Color  = Int -- placeholder
-
+ 
+-- | A representation for the line drawn by a turtle, from - to as pos and color
 data Line = Line
   { from    :: Pos
   , to      :: Pos
@@ -63,19 +67,25 @@ data Turtle = Turtle
   , pen :: Pen
   } deriving Show
 
+
+-- | Initiates a turtle at pos 0,0 facing east, that is drawing in black.
 initTurtle :: Turtle
 initTurtle = Turtle
   { pos = (0,0)
   , dir = (0,1)
-  , pen = Pen True 0
+  , pen = Pen True Black
   }
 
+-- | This is a representation of an action of the turtle.
 data Action = Act
   { counter   :: Int
   , operation :: Operation
   , turtle    :: Turtle
   } deriving Show
   
+
+-- | Just to be able to let the action keep track of everything and not only 
+-- the lines, messages to print in the runTextual ontop of the lines to be drawn
 data Operation
   = Op  Line   -- ^ The constructor 'Op' for an action resulting in a line
   | Msg String -- ^ Constructor for turtle actions not resulting in lines
@@ -105,7 +115,7 @@ newtype Program = P (Turtle -> Int -> ([Action],[Turtle]))
 -- * Constructors
 --------------------------------------------------------------------------------
 
--- | Moves turtle a distance 'd' in the direction it is facing 
+-- | Moves turtle the specified distance in the direction it is facing 
 forward :: Double -> Program
 forward d = P $ \t n ->
   let t' = move d t
@@ -114,13 +124,13 @@ forward d = P $ \t n ->
                                        " to " ++ show (pos t')    
   in ([Act (n+1) operation t'], [t'])
 
--- | Rotates turtle 'd' radians
+-- | Rotates turtle the specified amount of radians
 right :: Double -> Program
 right d = P $ \t n ->
   let t' = rotate d t in  ([Act (n+1) msg t'], [t'])
   where msg = if d /= 0
                 then Msg $ "turned " ++ show d ++ " radians"
-                else Msg $ "turtle idle"
+                else Msg "turtle idle"
 
 -- | Lifts the pen resulting in no drawn lines 
 penup :: Program
@@ -158,21 +168,20 @@ die = P $ \t n -> ([Act (n+1) msg t], [])
   (as1,[]) -> (as1,[])
   (as1,ts) -> (as1 ++ sortActions ass,ts')
     where m = counter . last $ as1
-          os = map (\t -> p2 t m) ts
+          os = map (`p2` m) ts
           ass = map fst os
           ass' = []
-          ts' = concat $ map snd os          
+          ts' = concatMap snd os          
           
--- * TEST
--- newtype Program = P (Turtle -> Int -> ([Action],[Turtle]))
-
--- | Parallel
+-- | Parallel combinator.
 (<|>) :: Program -> Program -> Program
 (P p1) <|> (P p2) = P $ \t n ->
   let (as1,ts1) = p1 t n
       (as2,ts2) = p2 t n
   in (sortActions [as1,as2],ts1 ++ ts2)
-  
+
+
+-- This is only to sort out the action lists. Only used internally here.
 sortActions :: [[Action]] -> [Action]
 sortActions []  = []
 sortActions ass =
@@ -185,7 +194,7 @@ sortActions ass =
          in heads ++ sortActions tails
   where ass' = filter (not . null) ass
  
--- | Limited
+-- | Limits the program to the specified amount of actions. 
 limited :: Int -> Program -> Program
 limited m (P p) = P $ \t n ->
   let (as,ts) = p t n
@@ -194,33 +203,47 @@ limited m (P p) = P $ \t n ->
        as' -> let i = (counter . last) as'
                   ts' = map turtle $ dropWhile ((<i) . counter) as'
               in (as',ts')
-               
+
+
+-- | Repeats a program the specified amount of times.
+times :: Int -> Program -> Program
+times n p | n < 2     = p
+          | otherwise = p >*> (times (n-1) p) 
+
+
 -- * Derived Combinators
+--------------------------------------------------------------------------------
+
+-- | A program step where the turtle does nothing.
 idle :: Program
 idle = right 0
 
+-- | Moves the turtle the distance backwards.
 backward :: Double -> Program
 backward = forward . negate
 
+-- | Turning the turtle to the left. 
 left :: Double -> Program
 left = right . negate
 
+
+-- | Repeats a program forever.
 forever  :: Program -> Program
 forever p = p >*> forever p
 
-times :: Int -> Program -> Program
-times n = limited n . forever
-
+-- | The turtles deathtimer.
 lifespan :: Int -> Program -> Program
 lifespan n p = limited n p >*> die
 
 -- * Run function
 --------------------------------------------------------------------------------
 
+
+-- | Runs the turtle and produces textual output.
 runTextual :: Program -> IO ()
 runTextual (P p) = 
   let (as,_) = p initTurtle 0
-  in sequence_ $ map (putStrLn . fromAction) as  
+  in mapM_ (putStrLn . fromAction) as  
   where fromAction a = show (counter a) ++ ": " ++ fromOp a
         fromOp a =
           case operation a of
@@ -228,23 +251,17 @@ runTextual (P p) =
             Op (Line from to c) -> "drew line from " ++ show from ++
                                    " to " ++ show to 
 
+-- | Runs the program and produces all the lines.
 runLines :: Program -> [Line]
 runLines (P p) =
   let (as,_) = p initTurtle 0
   in lines as
 
+-- Internal to convertactions to lines (to be drawn).
 lines :: [Action] -> [Line]
 lines [] = []
 lines (Act _ op _ : as) = case op of
   Op l -> l : lines as
   _    -> lines as
 
-
--- * Test programs
---------------------------------------------------------------------------------
-prog_1 = forward 2
-prog_2 = right 0 >*> right 1
-prog_3 = right (pi/2) >*> penup >*> forward 1 >*> pendown >*> forward 1
-prog_forever = forever idle
-prog_not_forever = idle >*> die >*> forever idle
   

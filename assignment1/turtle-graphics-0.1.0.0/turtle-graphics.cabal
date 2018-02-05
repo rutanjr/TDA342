@@ -18,7 +18,10 @@ library
   exposed-modules:     
     TurtleGraphics
     , Turtle
-  -- other-modules:       
+  --other-modules: 
+    , TurtleSpiral
+    , TurtleExtras
+    , TestPrograms      
   build-depends:       base >= 4 && < 5,
                        HGL
 					   -- Add anything your package depends on here
