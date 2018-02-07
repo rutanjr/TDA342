@@ -52,36 +52,69 @@ ask q = Ask q
 emptyTrace :: Trace r
 emptyTrace = []
 
--- | Takes a trace and an asnwer and appends the asnwer to the end of the trace
+-- | Appends an answer to the end of a trace
 addAnswer :: Trace r -> r -> Trace r
 addAnswer t r = t ++ [Answer r]
 
 -- * Run function
 --------------------------------------------------------------------------------
 
--- Ask    :: q -> Replay q r a
--- InOut   :: IO a -> Replay q r a
--- Return :: a -> Replay q r a
--- Bind   :: Replay q r a -> (a -> Replay q r b) -> Replay q r b
+--Ask    :: q -> Replay q r r
+--InOut  :: (Show a, Read a) => IO a -> Replay q r a 
+--Return :: a -> Replay q r a 
+--Bind   :: (Replay q r) a -> (a -> (Replay q r) b) -> (Replay q r) b
 
+-- | Runs a Replay program
 run :: Replay q r a -> Trace r -> IO (Either (q, Trace r) a)
-run (Ask q)    t      = return $ Left (q,t)
-run (InOut io) []     = do
-  a <- io
-  return temp
-  where temp = undefined
- 
-run (InOut io) (i:is) = undefined
-  
-run (Return a) t = return (Right a)
-run (Bind a f) t = undefined
+run (Ask q) t = case t of
+  (Answer r:t') -> return $ Right r
+  _             -> return $ Left (q,t)
+run (InOut ma) t = case t of
+  [] -> ma >>= return . Right
+  (i:is) -> let (Result str) = i in return $ Right (read str)   
+run (Return a)  t = return $ Right a
+-- * does not work atm
+run (Bind ra f) t = case ra of
+  (InOut ma) -> do
+    ea <- run (InOut ma) t
+    let Right a = ea
+    run (f a) $ t ++ [Result $ show a]
+  _          -> do
+    ea <- run ra t
+    case ea of
+      Right a     -> run (f a) $ t
+      Left (q,t') -> return $ Left (q,t')
+
+{- |
+Might want a IOBind
+-}
+
+-- run (Bind ra f) t = do
+--   ma <- run ra t
+--   case ma of
+--     Right a     -> run (f a) $ t
+--     Left (q,t') -> return $ Left (q,t')
+
+-- * TESTING
+--------------------------------------------------------------------------------
+prog_mini = io $ putStrLn "mini"
+
+prog_uganda = ask "Do you know de wey?"
+
+prog_test = do
+  io $ putStrLn "1"
+  io $ putStrLn "2"
+
+prog_trace = do
+  io $ putStrLn "1"
+  io $ putStrLn "2"
+  ask "Show me the trace?"
 
 -- * Monad magic
 --------------------------------------------------------------------------------
-
 instance Functor (Replay q r) where
     fmap = liftM
-
+    
 instance Applicative (Replay q r) where
     pure  = return
     (<*>) = ap
