@@ -48,11 +48,13 @@ ask q = Ask q
 -- * Trace manipulation
 --------------------------------------------------------------------------------
 
+-- | The empty trace, which is just and empty list
 emptyTrace :: Trace r
 emptyTrace = []
 
+-- | Takes a trace and an asnwer and appends the asnwer to the end of the trace
 addAnswer :: Trace r -> r -> Trace r
-addAnswer t r = Answer r : t
+addAnswer t r = t ++ [Answer r]
 
 -- * Run function
 --------------------------------------------------------------------------------
