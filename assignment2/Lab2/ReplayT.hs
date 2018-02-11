@@ -1,5 +1,17 @@
 {-# LANGUAGE GADTs #-}
-module ReplayT where
+module ReplayT (
+  -- * Types
+  ReplayT, Trace, Item (Answer,Result)
+  -- * Derived combinators
+  , action
+  , query
+  -- * Trace manipulation
+  , emptyTrace
+  , addAnswer
+  -- * Run and lift functions
+  , runReplayT
+  , liftR
+               ) where
 
 import Control.Monad (liftM,ap)
 import Control.Monad.Trans
@@ -7,13 +19,6 @@ import Control.Monad.Trans
 
 -- * Types
 --------------------------------------------------------------------------------
-
--- * type Replay q r a = ReplayT IO q r a
--- * liftR :: (Monad m, Show a, Read a) => m a -> ReplayT m q r a
-
---newtype ReplayT m q r a = ReplayT {
---  runReplayT :: ReplayT m q r a -> Trace r ->  m (Either (q, Trace r) a)
---  }
 
 data ReplayT m q r a where
   QueryBind  :: q -> (r -> ReplayT m q r a) -> ReplayT m q r a
@@ -26,7 +31,10 @@ instance Monad (ReplayT m q r) where
   ActionBind ma k >>= f = ActionBind ma $ \a -> k a >>= f
   QueryBind q k   >>= f = QueryBind q $ \r -> k r >>= f
 
--- instance MonadTrans (ReplayT m q r) where
+-- Can not be defined because MonadTrans requires a monad on the form
+-- t m a and replat is of the form Replay m q r a so there is no wat ro match
+-- t m a.
+--instance MonadTrans (ReplayT m q r) where
 --  lift = undefined
 
 type Trace r = [Item r] 
@@ -37,9 +45,11 @@ data Item r = Answer r | Result String
 -- * Operation
 --------------------------------------------------------------------------------
 
+-- | Execute a monadic action on the Replay program.
 action :: (Show a, Read a) => m a -> ReplayT m q r a
 action ma = ActionBind ma Return
 
+-- | Query the user for an answer by halting the Replay program.
 query :: q -> ReplayT m q r r
 query q = QueryBind q Return
 
@@ -57,32 +67,31 @@ addAnswer t r = t ++ [Answer r]
 -- * Run function
 --------------------------------------------------------------------------------
 
-runReplayT :: ReplayT m q r a -> Trace r -> m (Either (q, Trace r) a)
-runReplayT = undefined
+-- | Runs a ReplayT program and wraps the result in the inner monad 'm'.
+runReplayT :: Monad m => ReplayT m q r a -> Trace r -> m (Either (q, Trace r) a)
+runReplayT (Return a) t = return $ Right a
+runReplayT (QueryBind q k) t = case t of
+  (Answer r:t') -> evalBind (Answer r) $ runReplayT (k r) t'
+  _             -> return $ Left (q,t)
+runReplayT (ActionBind ma k) t = case t of
+  [] -> do
+    a <- ma
+    evalBind (Result $ show a) $ runReplayT (k a) []
+  (Result a:t) -> evalBind (Result a) $ runReplayT (k $ read a) t
 
+-- | Evaluates the result of a run of a Replay program found in ActionBind or
+-- QueryBind and returns the appropriate question and trace, or result.
+evalBind :: Monad m => Item r -> m (Either (q, Trace r) a) -> m (Either (q, Trace r) a)
+evalBind i k = do
+  ea <- k
+  case ea of
+    Left (q,t') -> return $ Left (q, i:t')
+    _           -> k
+
+-- | Lifts a monadic action from the embedded monad into ReplayT by executing
+-- the action with 'action'.
 liftR :: (Monad m, Show a, Read a) => m a -> ReplayT m q r a
-liftR = undefined
-
--- -- | Runs a Replay program with a trace 
--- run :: Replay q r a -> Trace r -> IO (Either (q, Trace r) a)
--- run (Return a)  t = return $ Right a
--- run (AskBind q k) t = case t of
---   (Answer r:t') -> evalBind (Answer r) $ run (k r) t'
---   _             -> return $ Left (q,t)
--- run (IOBind ma k) t = case t of
---   [] -> do
---     a <- ma
---     evalBind (Result $ show a) $ run (k a) []
---   (Result a:t) -> evalBind (Result a) $ run (k $ read a) t
-
--- -- | Evaluates the result of a run of a Replay program found in IOBind or
--- -- AskBind and returns the appropriate question and trace, or result.
--- evalBind :: Item r -> IO (Either (q, Trace r) a) -> IO (Either (q, Trace r) a)
--- evalBind i k = do
---   ea <- k
---   case ea of
---     Left (q,t') -> return $ Left (q, i:t')
---     _           -> k
+liftR ma = action ma
   
 -- * Monad magic
 --------------------------------------------------------------------------------
