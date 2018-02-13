@@ -13,16 +13,16 @@ name:                replay
 version:             0.1.0.0
 
 -- A short (one-line) description of the package.
--- synopsis:            
+synopsis:            Package for Replay programs able to resume after halting.
 
 -- A longer description of the package.
--- description:         
+description:         Package of interface for writing Replay programs. Replay program can be halted by prompting for input and then resume execution without reexecuting already executed code. It does this by using a trace of computations and input.
 
 -- The license under which the package is released.
 -- license:             
 
 -- The file containing the license text.
-license-file:        LICENSE
+-- license-file:        LICENSE
 
 -- The package author(s).
 author:              Oskar Rutqvist
@@ -31,11 +31,12 @@ author:              Oskar Rutqvist
 -- An email address to which users can send suggestions, bug reports, and 
 -- patches.
 maintainer:          rutanjr@gmail.com
+                     , tobias.rastemo@gmail.com
 
 -- A copyright notice.
 -- copyright:           
 
--- category:            
+category:            Assignment
 
 build-type:          Simple
 
@@ -44,7 +45,7 @@ build-type:          Simple
 -- extra-source-files:  
 
 -- Constraint on the version of Cabal needed to build this package.
-cabal-version:       >=1.10
+cabal-version:       >=1.8
 
 
 library
@@ -65,5 +66,12 @@ library
   -- hs-source-dirs:      
   
   -- Base language which the package is written in.
-  default-language:    Haskell2010
+  --  default-language:    Haskell2010
+
+  
+Test-Suite test-replay
+  type:            exitcode-stdio-1.0
+  hs-source-dirs:  test
+  main-is:         Test.hs
+  build-depends:   base, replay
   

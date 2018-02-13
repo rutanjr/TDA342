@@ -1,122 +1,42 @@
-{-# Language GADTs #-}
-
+-- | A module containing Replay progams, which keep a trace of computations and
+-- can resume execution after halting.
 module Replay(
   -- * Types
   Replay, Trace, Item (Result,Answer)
-  -- * Primitive
+  -- * Derived
   , io
   , ask
   , addAnswer
-  , emptyTrace
-  -- * Derived
-  
+  , emptyTrace  
   -- * Run
   , run
   ) where
 
+import ReplayT
 import Control.Monad (liftM,ap)
 
 -- * Types
 --------------------------------------------------------------------------------
 
-data Replay q r a where
-    -- Constructors
-    Ask    :: q -> Replay q r r
-    InOut  ::(Show a, Read a) => IO a -> Replay q r a
-    Return :: a -> Replay q r a
-    -- Combinators 
-    Bind   :: (Replay q r) a -> (a -> (Replay q r) b) -> (Replay q r) b
-
--- | Adding the QA r first in the list.
-type Trace r = [Item r] 
-
-data Item r = Answer r | Result String
-  deriving (Show,Read)
+-- | Replay type, using IO as the lower level monad for ReplayT
+type Replay q r a = ReplayT IO q r a
 
 -- * Operations
 --------------------------------------------------------------------------------
-instance Monad (Replay q r) where 
-    return = Return
-    (>>=)  = Bind
 
+-- | Execute IO action inside Replay program or load it from the trace if the
+-- result is already in the trace
 io :: (Show a, Read a) => IO a -> Replay q r a
-io = InOut
+io = action
 
+-- | Pose question to user and stop the Replay program if no answer is found in
+-- the trace.
 ask :: q -> Replay q r r
-ask = Ask
-
--- * Trace manipulation
---------------------------------------------------------------------------------
-
--- | The empty trace, which is just and empty list
-emptyTrace :: Trace r
-emptyTrace = []
-
--- | Appends an answer to the end of a trace
-addAnswer :: Trace r -> r -> Trace r
-addAnswer t r = t ++ [Answer r]
+ask = query
 
 -- * Run function
 --------------------------------------------------------------------------------
 
-{-|
-Ask    :: q -> Replay q r r
-InOut  :: (Show a, Read a) => IO a -> Replay q r a 
-Return :: a -> Replay q r a 
-Bind   :: (Replay q r) a -> (a -> (Replay q r) b) -> (Replay q r) b
-
-Left identity:
-return a >>= f == f a
-Right identity:
-m >>= return == m
-Associativity:
-(m >>= f) >>= g == m >>= (\x -> f x >>= g)
--}
-
 -- | Runs a Replay program
 run :: Replay q r a -> Trace r -> IO (Either (q, Trace r) a)
-run (Ask q) t = case t of
-  (Answer r:t') -> return $ Right r
-  _             -> return $ Left (q,t)
-run (InOut ma) t = case t of
-  [] -> ma >>= return . Right
-  (i:is) -> let (Result str) = i in return $ Right (read str)   
-run (Return a)  t = return $ Right a
--- Bind changes the trace
-run (Bind (Return a)  f) t = run (f a) t
-run (Bind (Bind ra g) f) t = run (Bind ra (\x -> Bind (g x) f )) t -- Associativity of Monads
-run (Bind (InOut ma)  f) t = do
-  -- Run IO
-  (Right b) <- run (InOut ma) t
-  -- Checking if trace should be extended
-  let t' = if null t
-           then [Result $ show b]
-           else t
-  -- Run the rest of the replay program
-  ea <- run (f b) (tail t')
-  -- Concatenate outputs if Left
-  case ea of
-    Left (q,t'') -> return $ Left (q,head t' : t'')
-    _            -> return ea  
-run (Bind (Ask q)     f) t = do
-  eb <- run (Ask q) t
-  case eb of
-    Right b -> do
-      -- Run the rest of the replay program
-      ea <- run (f b) (tail t)
-      -- Concatenate outputs if Left
-      case ea of
-        Left (q,t') -> return $ Left (q,head t : t')
-        _           -> return ea        
-    -- Terminate run if no answer is found
-    Left p -> return $ Left p
-  where runRest b t = undefined
-
--- * Monad magic
---------------------------------------------------------------------------------
-instance Functor (Replay q r) where
-    fmap = liftM
-    
-instance Applicative (Replay q r) where
-    pure  = return
-    (<*>) = ap
+run ra t = runReplayT ra t

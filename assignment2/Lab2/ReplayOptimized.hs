@@ -75,11 +75,11 @@ run (IOBind ma k) t = case t of
 -- | Evaluates the result of a run of a Replay program found in IOBind or
 -- AskBind and returns the appropriate question and trace, or result.
 evalBind :: Item r -> IO (Either (q, Trace r) a) -> IO (Either (q, Trace r) a)
-evalBind i k = do
-  ea <- k
+evalBind i ma = do
+  ea <- ma
   case ea of
     Left (q,t') -> return $ Left (q, i:t')
-    _           -> k
+    _           -> return ea
   
 -- * Monad magic
 --------------------------------------------------------------------------------
