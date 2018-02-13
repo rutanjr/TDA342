@@ -1,0 +1,18 @@
+Part I:
+Question: why is it not possible to make your transformer an instance of MonadTrans?
+
+The type of (ReplayT m q r a) does not allow i to become a part of MonadTrans since the monad transofmer is required to be of the form (t m a) where t is the monad transformer. Since ReplayT does not fullfill this it cannot be and instance of MonadTrans.
+
+If we wrap ReplayT inside another monad called ReplayT' such that
+
+   newtype ReplayT' q r m a = MkReplayT (ReplayT m q r a)
+
+we solve the problem with the type parameters being in the wrong order. However when we try to make this an instance of MonadTrans we ecounter another error. Our definition of lift is liftR and its type signature looks like
+
+   liftR :: (Monad m, Show a, Read a) => m a -> ReplayT m q r a
+
+Here we impose an extra coniftion on a, namely that it is an instance of Show and Read. This is due to liftR merely being
+
+     liftR = ActionBind ma Return
+
+and we have to be able to read and write the results to our Trace. So we can not make ReplayT an instance of MonadTrans even if we change the order of the type arguments.
