@@ -50,7 +50,20 @@ drawRainbowSquare n = pendown
     >*> color Green >*> forward n >*> right (0.5 * pi)
     >*> color Yellow >*> forward n >*> right (0.5 * pi)
     >*> color Red >*> forward n >*> right (0.5 * pi)
+-- * Higher order functions
+--------------------------------------------------------------------------------
 
+-- | Given a function 'ta' and a function 'f' create an infite sequence of
+-- turtle programs where  the function 'f' is applied the argument of 'ta' each
+-- recursive call.
+transform :: (a -> Program) -> (a -> a) -> a -> Program
+transform ta f a = (ta a) >*> transform ta f (f a)
 
+-- | Recreation of spiral program using the transform program
+spiral :: Double -> Double -> Program
+spiral s d = transform (\s -> forward s >*> right d) (+2) s
 
+-- | Creates tree using transform
+tree s d = transform branch (*0.8) s
+  where branch s = forward s >*> (left d <|> right d)
 
