@@ -8,7 +8,6 @@ module TurtleExtras where
 import Turtle
 import Graphics.HGL
 
-
 -- * Functions drawing shapes in specified colors
 --------------------------------------------------------------------------------
 
@@ -50,6 +49,7 @@ drawRainbowSquare n = pendown
     >*> color Green >*> forward n >*> right (0.5 * pi)
     >*> color Yellow >*> forward n >*> right (0.5 * pi)
     >*> color Red >*> forward n >*> right (0.5 * pi)
+
 -- * Higher order functions
 --------------------------------------------------------------------------------
 
@@ -64,6 +64,17 @@ spiral :: Double -> Double -> Program
 spiral s d = transform (\s -> forward s >*> right d) (+2) s
 
 -- | Creates tree using transform
+tree :: Double -> Double -> Program
 tree s d = transform branch (*0.8) s
   where branch s = forward s >*> (left d <|> right d)
 
+-- | The same as transform except that that it uses 2 variables that change
+-- each iteration.
+transform2 :: (a -> b -> Program) -> (a -> a) -> (b -> b) -> a -> b -> Program
+transform2 tp f g a b = transform (uncurry tp) h (a,b)
+  where h = \(a,b) -> (f a, g b)
+
+-- | Draws a tree with branches that shift in size and color as it gets deeper.
+colorTree :: Double -> Double -> Program
+colorTree s d = transform2 branch (*0.8) succ s Blue
+  where branch s c = color c >*> forward s >*> (left d <|> right d)
