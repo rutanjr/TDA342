@@ -80,7 +80,7 @@ evalBind i ma = do
   case ea of
     Left (q,t') -> return $ Left (q, i:t')
     _           -> return ea
-  
+
 -- * Monad magic
 --------------------------------------------------------------------------------
 instance Functor (Replay q r) where

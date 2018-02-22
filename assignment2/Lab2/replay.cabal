@@ -59,7 +59,7 @@ library
   -- other-extensions:    
   
   -- Other library packages from which modules are imported.
-  build-depends:       base >=4.8, time >= 1.6.0.1
+  build-depends:       base >=4.8, scotty >= 0.11.0, text >= 1.2.2.1, time >= 1.6.0.1
                        -- && <4.9
   
   -- Directories containing source files.
@@ -73,5 +73,5 @@ Test-Suite test-replay
   type:            exitcode-stdio-1.0
   hs-source-dirs:  test
   main-is:         Test.hs
-  build-depends:   base, replay
+  build-depends:   base, replay, scotty >= 0.11.0, text >= 1.2.2.1
   

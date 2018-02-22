@@ -18,7 +18,6 @@ module ReplayT (
                ) where
 
 import Control.Monad (liftM,ap)
-import Control.Monad.Trans
 
 -- * Types
 --------------------------------------------------------------------------------
@@ -29,6 +28,8 @@ data ReplayT m q r a where
   ActionBind :: (Show a, Read a) => m a -> (a -> ReplayT m q r b) ->
                 ReplayT m q r b
   Return     :: a -> ReplayT m q r a
+
+data ReplayT' q r m a = MkReplayT (ReplayT m q r a)
 
 instance Monad (ReplayT m q r) where
   return          = Return
