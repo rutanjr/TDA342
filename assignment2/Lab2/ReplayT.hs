@@ -29,8 +29,6 @@ data ReplayT m q r a where
                 ReplayT m q r b
   Return     :: a -> ReplayT m q r a
 
-data ReplayT' q r m a = MkReplayT (ReplayT m q r a)
-
 instance Monad (ReplayT m q r) where
   return          = Return
   Return a        >>= f = f a
