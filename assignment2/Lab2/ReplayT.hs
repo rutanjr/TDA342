@@ -18,7 +18,6 @@ module ReplayT (
                ) where
 
 import Control.Monad (liftM,ap)
-import Control.Monad.Trans
 
 -- * Types
 --------------------------------------------------------------------------------

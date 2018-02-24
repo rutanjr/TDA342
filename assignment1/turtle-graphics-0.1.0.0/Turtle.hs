@@ -1,13 +1,15 @@
+{-# LANGUAGE GADTs #-}
+
 {- |
 Module      : Turtle
-Description : Interface for writing turtle programs and a textual function to tun them.
+Description : Interface for writing turtle programs and a textual function to run them.
 
 The turtle interface provides primiteve, as well as derived, operators for creating turtle programs. The programs can be run with a textual function to produce a sequential list of performed actions.
 
 -}
 module Turtle (
   -- * The turtle types
-  Program (P), Action, Vector, Line(from,to, lineclr), Pos, Dir
+  Program (P), Action, Vector, Line(from,to,lineclr), Pos, Dir
   -- * Primitive operations
   , forward
   , right
@@ -68,7 +70,7 @@ data Turtle = Turtle
   } deriving Show
 
 
--- | Initiates a turtle at pos 0,0 facing east, that is drawing in black.
+-- | Initiates a turtle at pos 0,0 facing north, that is drawing in black.
 initTurtle :: Turtle
 initTurtle = Turtle
   { pos = (0,0)
@@ -263,5 +265,35 @@ lines [] = []
 lines (Act _ op _ : as) = case op of
   Op l -> l : lines as
   _    -> lines as
+
+-- * Partial deep embedding
+--------------------------------------------------------------------------------
+
+data ProgramDeep where
+  -- Constructors
+  Die     :: ProgramDeep
+  Idle    :: ProgramDeep
+  PenUp   :: ProgramDeep
+  PenDown :: ProgramDeep
+  Color   :: ProgramDeep
+  Forward :: Double -> ProgramDeep
+  Right   :: Double -> ProgramDeep  
+  -- Combinators
+  Par     :: ProgramDeep -> ProgramDeep -> ProgramDeep
+  Seq     :: ProgramDeep -> ProgramDeep -> ProgramDeep
+  Limited :: Int         -> ProgramDeep -> ProgramDeep
+
+-- * Deep run
+--------------------------------------------------------------------------------
+
+runDeep :: ProgramDeep -> Turtle -> ([Action],[Turtle])
+runDeep (Forward d) t =
+  let t' = move d t
+      operation | down (pen t) = Op  $ Line (pos t) (pos t') (clr . pen $ t) 
+                | otherwise    = Msg $ "moved from " ++ show (pos t) ++ 
+                                       " to " ++ show (pos t')    
+  in ([Act 0 operation t'], [t'])
+runDeep (Par p q) t   = undefined
+runDeep (Seq p q) t   = undefined
 
   

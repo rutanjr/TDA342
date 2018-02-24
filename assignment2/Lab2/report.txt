@@ -16,3 +16,20 @@ Here we impose an extra coniftion on a, namely that it is an instance of Show an
      liftR = ActionBind ma Return
 
 and we have to be able to read and write the results to our Trace. So we can not make ReplayT an instance of MonadTrans even if we change the order of the type arguments.
+
+We also have the problem of our liftR not fufilling the laws required for ReplayT to be an instance of MonadTrans. The two laws are
+
+     lift . return = return
+     lift (m >>= f) = lift m >>= (lift . f)
+
+The first one is satisfied but not the second. We can take a simple program as a counterexample. Consider the two programs
+
+    prog_lift = liftR (return () >>= const (return ()))
+    prog_bind = liftR (return ()) >>= liftR . return
+
+If the law holds these two should be the same and we would be able to interchange them without problem. However running these two with a question after like
+
+   runReplayT (prog_lift >> ask "")
+   runReplayT (prog_bind >> ask "")
+
+will produce different traces since in 'prog_lift' we only save one computational result and in 'prog_bind' two. So we cannot exchange the programs and use the other programs trace and thus they cannot be equal.

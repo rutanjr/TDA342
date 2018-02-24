@@ -6,7 +6,7 @@ shapes and in different colors etc.
 module TurtleExtras where
 
 import Turtle
-import Graphics.HGL
+import Graphics.HGL hiding (line)
 
 -- * Functions drawing shapes in specified colors
 --------------------------------------------------------------------------------
@@ -57,7 +57,7 @@ drawRainbowSquare n = pendown
 -- turtle programs where  the function 'f' is applied the argument of 'ta' each
 -- recursive call.
 transform :: (a -> Program) -> (a -> a) -> a -> Program
-transform ta f a = (ta a) >*> transform ta f (f a)
+transform tp f a = (tp a) >*> transform tp f (f a)
 
 -- | Recreation of spiral program using the transform program
 spiral :: Double -> Double -> Program
