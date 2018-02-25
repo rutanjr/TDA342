@@ -13,7 +13,6 @@ import Data.Text.Lazy (Text, unpack, pack)
 import Replay
 import Control.Monad.IO.Class (liftIO)
 import Codec.Binary.Base64.String
-import Data.Text.Encoding
 
 -- * Data types
 --------------------------------------------------------------------------------
@@ -21,7 +20,7 @@ import Data.Text.Encoding
 type Web a = Replay Form Answers a
 type Test a = Replay Int (Int -> Int) a
 
-type Form = [String]
+type Form = (String,[String])
 type Answers = [String]
 
 -- * Run
@@ -54,7 +53,6 @@ runWeb webProg = do -- action land
         [] -> return t
         _  -> return $ addAnswer t $ map (unpack . snd) is
 
-
 running :: Replay String String a -> IO a
 running prog = play emptyTrace
  where
@@ -68,24 +66,24 @@ running prog = play emptyTrace
       Right x -> return x                   
 
 fromForm :: Trace Answers -> Form -> Text
-fromForm t f = mconcat $
+fromForm t (title,f) = pack $ mconcat $
   [ "<html><body>"
-  , "<form method=post>"]
-  ++ textFields ++
-  [ "<input type=submit value=OK>"
+  , "<form method=post>"
+--  , "<p>" ++ title ++ "</p>"
+  , title
+  , textFields
+  , "<input type=submit value=OK>"
   , "<input type=hidden name=trace value="
-  , pack $ (concat . lines . encode . show) t ++ ">"
+  , (concat . lines . encode . show) t ++ ">"
   , "</form>"
   , "</body></html>"
   ]
   where
-    textFields = map pack $ concat $ zipWith
-      (\text label -> ["<p>" ++ text ++ "</p>",
-                       "<input name=" ++ label ++ ">"])
-      f $ map unpack inputnames
+    textFields = concat $ zipWith textField f (map unpack inputNames)
+    textField t l = "<p>" ++ t ++ "</p><input name=" ++ l ++ ">"
       
-inputnames :: [Text]
-inputnames = map (\n -> pack $ "input" ++ show n) [1..]
+inputNames :: [Text]
+inputNames = map (\n -> pack $ "input" ++ show n) [1..]
 
 -- * Example
 --------------------------------------------------------------------------------
@@ -97,8 +95,8 @@ main = scotty 3000 $ do
   
 example :: Web ()
 example = do
-  a1 <- ask ["Name?"]
-  [s1,s2] <- ask ["Age?","Yes"]
+  a1 <- ask ("Titletest",["Name?"])
+  [s1,s2] <- ask ("",["Age?","Yes"])
   if (read s1 < 18)
-    then (ask ["Must be over 18"] >> example)
+    then (ask ("Titletest",["Must be over 18"]) >> example)
     else return ()
