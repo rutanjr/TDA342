@@ -47,13 +47,13 @@ runWeb webProg = do -- action land
                       (\_ -> return emptyTrace)
 
     getAnswers :: Trace Answers -> ActionM (Trace Answers)
-    getAnswers _ = do
+    getAnswers t = do
       input <- params
-      let (is,[t]) = break (("trace" ==) . fst) input
-      undefined
+      let is = filter (("trace" /=) . fst) input
+      case is of
+        [] -> return t
+        _  -> return $ addAnswer t $ map (unpack . snd) is
 
-      -- rescue (param "input1" >>= \i -> return (addAnswer t [i]))
-      --                     (\_ -> return t)
 
 running :: Replay String String a -> IO a
 running prog = play emptyTrace
