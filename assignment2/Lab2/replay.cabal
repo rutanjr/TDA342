@@ -50,7 +50,7 @@ cabal-version:       >=1.8
 
 library
   -- Modules exported by the library.
-  exposed-modules:     Replay, ReplayT, ReplayState
+  exposed-modules:     Replay, ReplayT, ReplayState, Web
   
   -- Modules included in this library but not exported.
   -- other-modules:       
@@ -59,7 +59,7 @@ library
   -- other-extensions:    
   
   -- Other library packages from which modules are imported.
-  build-depends:       base >=4.8, mtl >= 2.2.1, scotty >= 0.11.0, text >= 1.2.2.1, time >= 1.6.0.1
+  build-depends:       base >=4.8, base64-string >= 0.2, mtl >= 2.2.1, scotty >= 0.11.0, text >= 1.2.2.1, time >= 1.6.0.1
                        -- && <4.9
   
   -- Directories containing source files.
@@ -67,11 +67,15 @@ library
   
   -- Base language which the package is written in.
   --  default-language:    Haskell2010
-
+executable web
+  hs-source-dirs:      executable
+  build-depends:       base >= 4 && < 5, scotty >= 0.11.0
+                       , replay
+  main-is: Example.hs
   
 Test-Suite test-replay
   type:            exitcode-stdio-1.0
   hs-source-dirs:  test
   main-is:         Test.hs
-  build-depends:   base, mtl >= 2.2.1, replay, scotty >= 0.11.0, text >= 1.2.2.1
+  build-depends:   base, base64-string >= 0.2, mtl >= 2.2.1, replay, scotty >= 0.11.0, text >= 1.2.2.1
   

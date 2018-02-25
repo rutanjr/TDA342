@@ -3,15 +3,13 @@
 {- | Web module
 -}
 module Web (
-  Web
-  , runWeb
-  
+  Web, Form, Answers
+  , runWeb  
   ) where
 
-import Web.Scotty     (ActionM, ScottyM, scotty, get, post, 
-  put, rescue, html, param, params, text)
-import Data.Text.Lazy (Text, unpack, pack)
 import Replay
+import Web.Scotty (ActionM, ScottyM, scotty, get, post, rescue, html, param, params)
+import Data.Text.Lazy (Text, unpack, pack)
 import Control.Monad.IO.Class (liftIO)
 import Codec.Binary.Base64.String
 
@@ -20,7 +18,6 @@ import Codec.Binary.Base64.String
 
 -- | Just a shorthand for an instance of the replay monad.
 type Web a = Replay Form Answers a
-type Test a = Replay Int (Int -> Int) a
 
 -- | Our form that has two parts, first the header as a String, and then
 -- all of our questions as a list of strings.
@@ -38,8 +35,6 @@ runWeb :: Web a -> ActionM ()
 runWeb webProg = do -- action land  
   t <- getTrace
   ta <- getAnswers t
-  temp <- params
-  liftIO $ putStrLn (show temp)
   r <- liftIO $ run webProg ta
   case r of
     Left (q,t') -> do -- action land
@@ -69,7 +64,6 @@ fromForm t (title,f) = pack $ mconcat $
   , "<head><title>" ++ title ++ "</title><h2>" ++ title ++ "</h2></head>"
   , "<body>"
   , "<form method=post>"
---  , "<p>" ++ title ++ "</p>"
   , textFields
   , "<input type=submit value=OK>"
   , "<input type=hidden name=trace value="
@@ -82,26 +76,6 @@ fromForm t (title,f) = pack $ mconcat $
     textField :: String -> String -> String
     textField t l = "<p>" ++ t ++ "</p><input name=" ++ l ++ ">"
       
--- Just gives a list of names for our inputboxes, input1, input2, input3,... 
+-- | Just gives a list of names for our inputboxes, input1, input2, input3,... 
 inputNames :: [Text]
 inputNames = map (\n -> pack $ "input" ++ show n) [1..]
-
--- * Example
---------------------------------------------------------------------------------
-
--- | Basically only runs our web program (starts scotty at port 3000 
--- and runs the example program)
-main :: IO ()
-main = scotty 3000 $ do
-  get  "/" $ runWeb example
-  post "/" $ runWeb example
-  
-
--- | Our exciting example program
-example :: Web ()
-example = do
-  a1 <- ask ("Titletest",["Name?"])
-  [s1,s2] <- ask ("",["Age?","Yes"])
-  if (read s1 < 18)
-    then (ask ("Titletest",["Must be over 18"]) >> example)
-    else return ()
