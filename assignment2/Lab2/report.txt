@@ -22,7 +22,7 @@ We also have the problem of our liftR not fufilling the laws required for Replay
      lift . return = return
      lift (m >>= f) = lift m >>= (lift . f)
 
-The first one is satisfied but not the second. We can take a simple program as a counterexample. Consider the two programs
+These are not satisfied. We can take a simple program as a counterexample. Consider the two programs
 
     prog_lift = liftR (return () >>= const (return ()))
     prog_bind = liftR (return ()) >>= liftR . return
