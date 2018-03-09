@@ -10,6 +10,7 @@ module Web (
 import Replay
 import Web.Scotty (ActionM, ScottyM, scotty, get, post, rescue, html, param, params)
 import Data.Text.Lazy (Text, unpack, pack)
+import Data.Maybe (catMaybes)
 import Control.Monad.IO.Class (liftIO)
 import Codec.Binary.Base64.String
 
@@ -21,7 +22,7 @@ type Web a = Replay Form Answers a
 
 -- | Our form that has two parts, first the header as a String, and then
 -- all of our questions as a list of strings.
-type Form = (String,[String])
+type Form = (String,[(String, Maybe (String -> Bool))])
 
 -- | Answers is just a list of strings, since that is what our input is.
 type Answers = [String]
@@ -34,13 +35,23 @@ type Answers = [String]
 runWeb :: Web a -> ActionM ()
 runWeb webProg = do -- action land  
   t <- getTrace
-  ta <- getAnswers t
-  r <- liftIO $ run webProg ta
+  r <- liftIO $ run webProg t
   case r of
-    Left (q,t') -> do -- action land
-      html (fromForm t' q)
-    r -> liftIO (putStrLn "OK") --return ()
-  where    
+    Left (q,t') -> do
+      as <- getAnswers
+      case validate as (map snd (snd q)) of
+        False -> html (fromForm t' q)
+        True  -> do
+          r <- liftIO $ run webProg $ addAnswer t' as
+          case r of
+            Left (q,t'') -> html(fromForm t'' q)
+            _            -> liftIO (putStrLn "OK")
+    r -> liftIO (putStrLn "OK") 
+  where
+    -- Validate input
+    validate :: Answers -> [Maybe (String -> Bool)] -> Bool
+    validate [] _  = False
+    validate as fs = (and . catMaybes) $ zipWith (<*>) fs (map pure as)
     -- Gets the trace from the html page.
     getTrace :: ActionM (Trace Answers)
     getTrace = rescue (do
@@ -48,14 +59,12 @@ runWeb webProg = do -- action land
                           return . read . decode $ t                          
                       )
                       (\_ -> return emptyTrace)
-    -- Help function that takes all input from the page except the trace.
-    getAnswers :: Trace Answers -> ActionM (Trace Answers)
-    getAnswers t = do
+    -- New help
+    getAnswers :: ActionM Answers
+    getAnswers = do
       input <- params
       let is = filter (("trace" /=) . fst) input
-      case is of
-        [] -> return t
-        _  -> return $ addAnswer t $ map (unpack . snd) is
+      return $ map (unpack . snd) is
 
 -- | Takes our trace, a form, and creates our html page.
 fromForm :: Trace Answers -> Form -> Text
@@ -72,7 +81,7 @@ fromForm t (title,f) = pack $ mconcat $
   , "</body></html>"
   ]
   where
-    textFields = concat $ zipWith textField f (map unpack inputNames)
+    textFields = concat $ zipWith textField (map fst f) (map unpack inputNames)
     textField :: String -> String -> String
     textField t l = "<p>" ++ t ++ "</p><input name=" ++ l ++ ">"
       
