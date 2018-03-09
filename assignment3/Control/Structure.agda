@@ -5,9 +5,6 @@ open import Control.RawMonad
 
 open RawFunctor {{...}} public
 
-test-lemma : {A B C : Set} {f : B → C}{g : A → B}{x : A} → (f ∘ g) x ≡ f (g x)
-test-lemma = refl
-
 instance
   ApplicativeToFunctor : ∀ {AF}{{_ : RawApplicative AF}} → RawFunctor AF
   fmap {{ApplicativeToFunctor}}                    = (_<*>_) ∘ pure -- pure f <*> x
@@ -21,7 +18,10 @@ instance
   MonadToApplicative : ∀ {M}{{_ : RawMonad M}} → RawApplicative M
   pure {{MonadToApplicative}}                         = return
   _<*>_ {{MonadToApplicative}}                  mf ma = mf >>= λ f → ma >>= λ a → return (f a)
-  applicative-identity-law {{MonadToApplicative}}     = {!!}
-  applicative-composition-law {{MonadToApplicative}}  = {!!}
-  applicative-homomorphism-law {{MonadToApplicative}} = {!!}
-  applicative-interchange {{MonadToApplicative}}      = {!!}
+  applicative-identity-law {{MonadToApplicative}} = trans monad-left-identity-law  monad-right-identity-law
+  applicative-composition-law {{MonadToApplicative}} {u}{v}{w}  =  {!!}
+  applicative-homomorphism-law {{MonadToApplicative}} = trans monad-left-identity-law monad-left-identity-law
+  applicative-interchange {{MonadToApplicative}} {u = u}{x = x} =
+    trans
+      ?
+      (sym monad-left-identity-law)
