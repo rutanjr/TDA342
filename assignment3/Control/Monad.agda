@@ -11,9 +11,6 @@ record Functor (F : Set → Set) : Set₁ where
     functor-composition-law : ∀ {A B C}{f : B → C}{g : A → B}
                               → fmap (f ∘ g) ≡ fmap f ∘ fmap g 
 
--- fmap id  ==  id
--- fmap (f . g)  ==  fmap f . fmap g
-
 open Functor {{...}} public
 
 infixl 5 _<$>_
@@ -56,43 +53,6 @@ open Monad {{...}} public
 
 _>>_ : ∀ {M} {{_ : Monad M}} {A B} → M A → M B → M B
 ma >> mb = ma >>= λ _ → mb
-
-{-
-x = y -> x : xs = y : xs
-xs = ys -> y : xs = y : ys
--}
-
-list-lemma : ∀ {A}{x y : A}{xs ys : List A} → x ≡ y → xs ≡ ys → x :: xs ≡ y :: ys
-list-lemma {y = y}{xs = xs} a as = trans (cong (λ x → x :: xs) a) (cong ((_::_) y) as)
-
--- map (f ∘ g) xs ≡ (map f ∘ map g) xs
--- (f ∘ g) x ≡ f (g x)
--- (map f ∘ map g) (x :: xs) ≡ (map f) (map g (x :: xs))
--- map g (x :: xs) ≡ g x :: map g xs
--- (map f) (map g (x :: xs)) ≡ (map f) (g x :: map g xs) ≡ f (g x) :: (map f) (map g xs)
-
-comp-lemma : ∀ {ℓ} {A B C : Set ℓ}{f : B → C}{g : A → B}{x : A} → (f ∘ g) x ≡ f (g x)
-comp-lemma = refl
-
--- list-comp : ∀ {A B C}{x : List A}{f : B → C}{g : A → B} → map (f ∘ g) x ≡ (map f ∘ map g) x
--- list-comp {x = []} = refl
--- list-comp {x = x :: xs} = {!!}
-
--- instance
---   ListFunctor : Functor List
---   fmap {{ListFunctor}} = map
---   functor-identity-law {{ListFunctor}} {x = []} = refl
---   functor-identity-law {{ListFunctor}} {x = x :: xs} = list-lemma refl functor-identity-law
---   functor-composition-law {{ListFunctor}} {A = A} = {!!}
-
-  -- ListMonad : Monad List
-  -- ListMonad = {!!}
-
-  -- MaybeFunctor : Functor Maybe
-  -- MaybeFunctor = {!!}
-
-  -- MaybeMonad : Monad Maybe
-  -- MaybeMonad = {!!}
 
 fail : ∀ {A} → Maybe A
 fail = Nothing
