@@ -56,25 +56,81 @@ drawRainbowSquare n = pendown
 -- | Given a function 'ta' and a function 'f' create an infite sequence of
 -- turtle programs where  the function 'f' is applied the argument of 'ta' each
 -- recursive call.
-transform :: (a -> Program) -> (a -> a) -> a -> Program
-transform tp f a = (tp a) >*> transform tp f (f a)
+loop :: (a -> Program) -> (a -> a) -> a -> Program
+loop tp f a = (tp a) >*> loop tp f (f a)
 
--- | Recreation of spiral program using the transform program
+-- | Recreation of spiral program using the loop program
 spiral :: Double -> Double -> Program
-spiral s d = transform (\s -> forward s >*> right d) (+2) s
+spiral s d = loop (\s -> forward s >*> right d) (+2) s
 
--- | Creates tree using transform
+-- | Creates tree using loop
 tree :: Double -> Double -> Program
-tree s d = transform branch (*0.8) s
+tree s d = loop branch (*0.8) s
   where branch s = forward s >*> (left d <|> right d)
 
--- | The same as transform except that that it uses 2 variables that change
+-- | The same as loop except that that it uses 2 variables that change
 -- each iteration.
-transform2 :: (a -> b -> Program) -> (a -> a) -> (b -> b) -> a -> b -> Program
-transform2 tp f g a b = transform (uncurry tp) h (a,b)
+loop2 :: (a -> b -> Program) -> (a -> a) -> (b -> b) -> a -> b -> Program
+loop2 tp f g a b = loop (uncurry tp) h (a,b)
   where h = \(a,b) -> (f a, g b)
 
 -- | Draws a tree with branches that shift in size and color as it gets deeper.
 colorTree :: Double -> Double -> Program
-colorTree s d = transform2 branch (*0.8) succ s Blue
+colorTree s d = loop2 branch (*0.8) succ s Blue
   where branch s c = color c >*> forward s >*> (left d <|> right d)
+
+-- * Turtle transformations
+--------------------------------------------------------------------------------
+
+-- | A transformation of all drawn lines. Only works propely for linear
+-- transformations.
+transform :: (Pos -> Pos) -> Program -> Program
+transform f (P p) = P $ \t n ->
+  let (as,ts) = p t n
+  in (map (transAction f) as, map (transTurtle f) ts) 
+  where
+    transTurtle :: (Pos -> Pos) -> Turtle -> Turtle
+    transTurtle f t = t { pos = f (pos t)
+                        , dir = transDir f (pos t) (dir t) }
+
+    transDir :: (Pos -> Pos) -> Pos -> Pos -> Pos
+    transDir f p d = let p' = f p +++ f (p +++ d)
+                     in 1 / (norm p') |* p'
+                        
+    transAction :: (Pos -> Pos) -> Action -> Action
+    transAction f a = a { turtle = transTurtle f (turtle a)
+                        , operation = transOp f (operation a)}
+
+    transOp :: (Pos -> Pos) -> Operation -> Operation
+    transOp f (Op l) = Op $ l { from = f (from l)
+                              , to   = f (to l)}
+    transOp _ op = op
+
+rotate :: Double -> Program -> Program
+rotate d p = transform f p
+  where f (x,y) = (cos d * x + sin d * y, cos d * y - sin d * x)
+
+scale :: Double -> Program -> Program
+scale d p = transform (d |*) p
+
+translate :: Pos -> Program -> Program
+translate pos p =  transform (pos+++) p
+
+-- * Some vector operations
+--------------------------------------------------------------------------------
+
+infixl 6 |*
+infixl 5 +++
+
+-- | Length of vector
+norm :: Pos -> Double
+norm (x,y) = sqrt (x^2 + y^2)
+
+-- | Multiply scalar with vector            
+(|*) :: Double -> Pos -> Pos
+d |* (x,y) = (d*x,d*y)
+
+-- | Add two vectors
+(+++) :: Pos -> Pos -> Pos
+(x,y) +++ (u,v) = (x+u,y+v)
+
