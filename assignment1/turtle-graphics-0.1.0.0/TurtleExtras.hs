@@ -82,8 +82,8 @@ colorTree s d = loop2 branch (*0.8) succ s Blue
 -- * Turtle transformations
 --------------------------------------------------------------------------------
 
--- | A transformation of all drawn lines. Only works propely for linear
--- transformations.
+-- | A transformation of all drawn lines and turtles. Only works propely for
+-- linear transformations.
 transform :: (Pos -> Pos) -> Program -> Program
 transform f (P p) = P $ \t n ->
   let (as,ts) = p t n
@@ -106,13 +106,16 @@ transform f (P p) = P $ \t n ->
                               , to   = f (to l)}
     transOp _ op = op
 
+-- | Rotates a turtle program 'd' radians around the origin.
 rotate :: Double -> Program -> Program
 rotate d p = transform f p
   where f (x,y) = (cos d * x + sin d * y, cos d * y - sin d * x)
 
+-- | Scales a program with a factor s
 scale :: Double -> Program -> Program
-scale d p = transform (d |*) p
+scale s p = transform (s |*) p
 
+-- | Translates a program along the vector p
 translate :: Pos -> Program -> Program
 translate pos p =  transform (pos+++) p
 
