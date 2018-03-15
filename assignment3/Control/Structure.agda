@@ -1,11 +1,7 @@
-{-# OPTIONS --allow-unsolved-metas #-}
-
 module Control.Structure where
 
 open import Prelude
 open import Control.Monad
-
---open Functor
 
 instance
   ApplicativeToFunctor : ∀ {AF}{{_ : Applicative AF}} → Functor AF
@@ -24,7 +20,6 @@ instance
         }
       }
 
-instance
   MonadToApplicative : ∀ {M}{{_ : Monad M}} → Applicative M
   MonadToApplicative {M} =
     let pure : {A : Set} -> A -> M A
@@ -61,11 +56,16 @@ instance
                  mg >>= (λ g → ma >>= λ a → return ((f ∘ g) a))
                    ∎ )⟩
              mf >>= (λ f → mg >>= λ g → ma >>= λ a → return ((f ∘ g) a))
-               ≡⟨ {!!} ⟩
-             {!!} ∎
+               ≡⟨ cong (λ m' → mf >>= m') (funExt λ f →
+                  trans (cong (λ m' → mg >>= m')
+                    (funExt λ g → trans (cong (λ m' → ma >>= m')
+                      (funExt λ a → sym monad-left-identity-law))
+                      monad-associativity-law))
+                    monad-associativity-law) ⟩
+             mf <*> (mg <*> ma) ∎
          }
          ; applicative-homomorphism-law = trans monad-left-identity-law monad-left-identity-law
-         ; applicative-interchange      =  λ { {u = u} →
+         ; applicative-interchange-law  =  λ { {u = u} →
            trans (cong ((_>>=_) u) (funExt λ x → monad-left-identity-law)) (sym monad-left-identity-law)
            } 
          }

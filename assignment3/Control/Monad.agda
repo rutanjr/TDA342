@@ -29,7 +29,7 @@ record Applicative (AF : Set → Set) : Set₁ where
                                    → pure _∘_ <*> u <*> v <*> w ≡ u <*> (v <*> w)
     applicative-homomorphism-law : ∀ {A B}{f : A → B}{x : A}
                                    → pure f <*> pure x ≡ pure (f x)
-    applicative-interchange      : ∀ {A B}{u : AF (A -> B)}{x : A}
+    applicative-interchange-law  : ∀ {A B}{u : AF (A -> B)}{x : A}
                                    → u <*> pure x ≡ pure (λ f → f x) <*> u
 
 open Applicative {{...}} public
