@@ -8,8 +8,8 @@ record Functor (F : Set → Set) : Set₁ where
     fmap                    : ∀ {A B} → (A → B) → F A → F B
     functor-identity-law    : ∀ {A}{x : F A}
                               → (fmap id) x ≡ id x 
-    functor-composition-law : ∀ {A B C}{f : B → C}{g : A → B}
-                              → fmap (f ∘ g) ≡ fmap f ∘ fmap g 
+    functor-composition-law : ∀ {A B C}{f : B → C}{g : A → B} --{x : F A}
+                              → fmap (f ∘ g) ≡ (fmap f ∘ fmap g)
 
 open Functor {{...}} public
 
@@ -21,7 +21,7 @@ ff <$> fb = fmap ff fb
 record Applicative (AF : Set → Set) : Set₁ where
   infixl 4 _<*>_
   field
-    {{functorA}} : Functor AF
+    --{{functorA}}                 : Functor AF
     pure                         : ∀ {A} → A → AF A
     _<*>_                        : ∀ {A B} → AF (A → B) → AF A → AF B
     applicative-identity-law     : ∀ {A}{v : AF A} → pure id <*> v ≡ v
@@ -37,9 +37,8 @@ open Applicative {{...}} public
 -- https://hackage.haskell.org/package/base/docs/Control-Monad.html#t:Monad
 record Monad (M : Set → Set) : Set₁ where
   infixl 3 _>>=_
-
   field
-    {{applicativeM}}         : Applicative M
+    --{{applicativeM}}         : Applicative M
     return                   : ∀ {A} → A → M A
     _>>=_                    : ∀ {A B} → M A → (A → M B) → M B
     monad-left-identity-law  : ∀ {A B}{x : A}{k : A → M B}

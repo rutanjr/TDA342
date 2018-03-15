@@ -1,19 +1,31 @@
+{-# OPTIONS --allow-unsolved-metas #-}
+
 module Control.Structure where
 
 open import Prelude
-open import Control.RawMonad
+open import Control.Monad
 
-open RawFunctor
-
-instance
-  ApplicativeToFunctor : ∀ {AF}{{_ : RawApplicative AF}} → RawFunctor AF
-  fmap                    ApplicativeToFunctor                       = (_<*>_) ∘ pure
-  functor-identity-law    ApplicativeToFunctor                       = applicative-identity-law
-  functor-composition-law ApplicativeToFunctor {f = f}{g = g}{x = x} =
-    trans (trans (cong (λ y → y <*> x) (sym applicative-homomorphism-law)) (sym (cong (λ y → y <*> pure g <*> x) applicative-homomorphism-law))) applicative-composition-law
+--open Functor
 
 instance
-  MonadToApplicative : ∀ {M}{{_ : RawMonad M}} → RawApplicative M
+  ApplicativeToFunctor : ∀ {AF}{{_ : Applicative AF}} → Functor AF
+  ApplicativeToFunctor {AF}  =
+    record
+      { fmap = _<*>_ ∘ pure
+      ; functor-identity-law = applicative-identity-law
+      ; functor-composition-law = λ { {f = f}{g = g} →
+        funExt λ x →
+          trans (
+          trans (
+          cong (λ y → y <*> x) (
+          sym applicative-homomorphism-law)) (
+          sym (cong (λ y → y <*> pure g <*> x) applicative-homomorphism-law)))
+          applicative-composition-law
+        }
+      }
+
+instance
+  MonadToApplicative : ∀ {M}{{_ : Monad M}} → Applicative M
   MonadToApplicative {M} =
     let pure : {A : Set} -> A -> M A
         pure                            = return
@@ -30,11 +42,16 @@ instance
              m = return (_∘_) >>= λ h → mf >>= λ f → return (h f)
              k : ∀ {D} → ((A → B) → D) → M D 
              k = λ h' → mg >>= λ g → return (h' g)
-             --h : ∀ {D} → (A → D) → M D 
              h = λ h'' → ma >>= λ a → return (h'' a)
            in
              ((pure (_∘_) <*> mf) <*> mg) <*> ma
-               ≡⟨ sym (trans monad-associativity-law (trans (trans (sym monad-left-identity-law) monad-associativity-law ) monad-associativity-law)) ⟩
+               ≡⟨ sym (
+                  trans monad-associativity-law (
+                  trans (
+                  trans (
+                  sym monad-left-identity-law)
+                  monad-associativity-law )
+                  monad-associativity-law)) ⟩
              mf >>= (λ f → (return ((_∘_) f) >>= λ h' → mg >>= (λ g → return (h' g)) >>= h))
                ≡⟨ cong ((_>>=_) mf) (funExt λ f →
                  (return ((_∘_) f) >>= λ h' → mg >>= (λ g → return (h' g)) >>= h)
