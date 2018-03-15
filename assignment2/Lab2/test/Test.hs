@@ -3,6 +3,7 @@ module Main where
 import Data.IORef
 import Replay
 import System.Exit
+import Test.QuickCheck hiding (Result)
 
 -- | Runs the test suite for the replay library
 main :: IO ()
@@ -49,15 +50,15 @@ runProgram p inp = do
 
 -- | Checking a test case. Compares expected and actual results.
 checkTestCase :: TestCase -> IO Bool
-checkTestCase (TestCase name i r p) = do
-  putStr $ name ++ ": "
+checkTestCase test@(TestCase name i r p) = do
+  --putStr $ name ++ ": "
+  putStr $ show test ++ ": "
   r' <- runProgram p i
   if r == r'
     then putStrLn "ok" >> return True
     else putStrLn ("FAIL: expected " ++ show r ++
                   " instead of " ++ show r')
-         >> return False
-    
+         >> return False    
 
 -- | List of interesting test cases.
 testCases :: [TestCase]
@@ -120,3 +121,71 @@ testCases =
 -- | Running all the test cases.
 runTests = mapM checkTestCase testCases
 
+-- * Quick check testing and generation of test cases
+--------------------------------------------------------------------------------
+
+instance Show TestCase where
+  show t = "Test name: " ++ testName t ++ "\n" ++
+           "Test input: " ++ show (testInput t) ++ "\n" ++
+           "Test resulst: " ++ show (testResult t) ++ "\n" 
+
+instance Arbitrary TestCase where
+  arbitrary = rTestCases 10
+
+rTestCases :: Int -> Gen TestCase
+rTestCases n = do
+  c1 <- frequency subCase
+  c2 <- frequency subCase
+  return TestCase { testName = testName c1 ++ testName c2
+                  , testInput = testInput c1 ++ testInput c2
+                  , testResult =
+                      let (r1,t1) = testResult c1
+                          (r2,t2) = testResult c2
+                      in (r1+r2,t1+t2)
+                  , testProgram = \tick -> do
+                      r1 <- testProgram c1 tick
+                      r2 <- testProgram c2 tick
+                      return (r1 + r2)
+                  }
+  where
+    subCase :: [(Int,Gen TestCase)]
+    subCase = [(2,rAsk),
+               (2,rTick),
+               (1,rIO),
+               (1,rRet),
+               (n,rTestCases $ n - 1)]
+    -- | Representing questions and answers from user
+    rAsk :: Gen TestCase
+    rAsk = do
+      i <- fmap abs arbitrary
+      return TestCase { testName = "a"
+                      , testInput = [i]
+                      , testResult = (i,0)
+                      , testProgram = \tick -> ask ()
+                      }
+    -- | Representing IO actions with only side effects
+    rTick :: Gen TestCase
+    rTick = do
+      return TestCase { testName = "t"
+                      , testInput = []
+                      , testResult = (0,1)
+                      , testProgram = \tick -> io tick >> return 0
+                      }
+    -- | Representing IO actions with only return values
+    rIO :: Gen TestCase
+    rIO = do
+      n <- fmap abs arbitrary
+      return TestCase { testName = "i"
+                      , testInput = []
+                      , testResult = (n,0)
+                      , testProgram = \tick -> io (return n)
+                      }
+    -- | Representing monad returns
+    rRet :: Gen TestCase
+    rRet = do
+      n <- fmap abs arbitrary
+      return TestCase { testName = "r"
+                      , testInput = []
+                      , testResult = (n,0)
+                      , testProgram = \tick -> return n
+                      }
