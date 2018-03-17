@@ -28,18 +28,21 @@ data ReplayT m q r a where
   ActionBind :: (Show a, Read a) => m a -> (a -> ReplayT m q r b) ->
                 ReplayT m q r b
   Return     :: a -> ReplayT m q r a
+  CutBind    :: (Show a, Read a) => ReplayT m q r a -> (a -> ReplayT m q r b) ->
+                ReplayT m q r b
 
 instance Monad (ReplayT m q r) where
   return          = Return
   Return a        >>= f = f a
-  ActionBind ma k >>= f = ActionBind ma $ \a -> k a >>= f
-  QueryBind q k   >>= f = QueryBind q   $ \r -> k r >>= f
+  ActionBind ma f >>= g = ActionBind ma $ \a -> f a >>= g
+  QueryBind  q  f >>= g = QueryBind  q  $ \r -> f r >>= g
+  CutBind    ma f >>= g = CutBind    ma $ \a -> f a >>= g
 
 -- | Trace of computations by a Replay program
 type Trace r = [Item r] 
 
 -- | A trace item is either the answer to a query or the result of a computation
-data Item r = Answer r | Result String
+data Item r = Answer r | Result String | ShortCut String
   deriving (Show,Read)
 
 -- * Operation
@@ -52,6 +55,9 @@ action ma = ActionBind ma Return
 -- | Query the user for an answer by halting the Replay program.
 query :: q -> ReplayT m q r r
 query q = QueryBind q Return
+
+cut :: (Monad m, Read a, Show a) => ReplayT m q r a -> ReplayT m q r a
+cut ma = CutBind ma Return
 
 -- * Trace manipulation
 --------------------------------------------------------------------------------
@@ -78,6 +84,13 @@ runReplayT (ActionBind ma k) t = case t of
     a <- ma
     evalBind (Result $ show a) $ runReplayT (k a) []
   (Result a:t) -> evalBind (Result a) $ runReplayT (k $ read a) t
+runReplayT (CutBind ma f) t = case t of
+  (s@(ShortCut a):t')  -> evalBind s $ runReplayT (f $ read a) t'
+  _                -> do
+    ea <- runReplayT ma t
+    case ea of
+      Left (q,t') -> return $ Left (q,t')
+      Right a     -> evalBind (ShortCut $ show a) $ runReplayT (f a) []
 
 -- | Evaluates the result of a run of a Replay program found in ActionBind or
 -- QueryBind and returns the appropriate question and trace, or result.
