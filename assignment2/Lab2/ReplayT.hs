@@ -9,6 +9,7 @@ module ReplayT (
   -- * Derived combinators
   , action
   , query
+  , cut
   -- * Trace manipulation
   , emptyTrace
   , addAnswer
@@ -42,7 +43,8 @@ instance Monad (ReplayT m q r) where
 type Trace r = [Item r] 
 
 -- | A trace item is either the answer to a query or the result of a computation
-data Item r = Answer r | Result String | ShortCut String
+data Item r = Answer r | Result String | ShortCut (Maybe String)
+                                         -- ShortCut (Maybe String) ?
   deriving (Show,Read)
 
 -- * Operation
@@ -85,12 +87,15 @@ runReplayT (ActionBind ma k) t = case t of
     evalBind (Result $ show a) $ runReplayT (k a) []
   (Result a:t) -> evalBind (Result a) $ runReplayT (k $ read a) t
 runReplayT (CutBind ma f) t = case t of
-  (s@(ShortCut a):t')  -> evalBind s $ runReplayT (f $ read a) t'
-  _                -> do
-    ea <- runReplayT ma t
-    case ea of
-      Left (q,t') -> return $ Left (q,t')
-      Right a     -> evalBind (ShortCut $ show a) $ runReplayT (f a) []
+  (s@(ShortCut (Just a)):t') -> evalBind s $ runReplayT (f $ read a) t'
+  (s@(ShortCut Nothing):t')  -> runShortCut ma t'
+  _                -> runShortCut ma t
+  where
+    runShortCut ma t = do
+      ea <- runReplayT ma t
+      case ea of
+        Left (q,t') -> return $ Left (q, ShortCut Nothing:t')
+        Right a      -> evalBind (ShortCut $ Just (show a)) $ runReplayT (f a) []
 
 -- | Evaluates the result of a run of a Replay program found in ActionBind or
 -- QueryBind and returns the appropriate question and trace, or result.

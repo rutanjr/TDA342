@@ -74,6 +74,14 @@ testCases =
         c <- ask () -- should be 4
         return (a + b + c)
     } ,
+    -- Testing simple cut
+    TestCase
+    { testName    = "test_cut_return"
+    , testInput   = []
+    , testResult  = (0,0)
+    , testProgram = \tick -> do
+        cut (return 0)
+    } ,
     -- Testing a single return and empty trace
     TestCase
     { testName    = "test_return"
@@ -127,33 +135,47 @@ runTests = mapM checkTestCase testCases
 instance Show TestCase where
   show t = "Test name: " ++ testName t ++ "\n" ++
            "Test input: " ++ show (testInput t) ++ "\n" ++
-           "Test resulst: " ++ show (testResult t) ++ "\n" 
+           "Test result: " ++ show (testResult t) ++ "\n" 
 
 instance Arbitrary TestCase where
-  arbitrary = rTestCases 10
+  arbitrary = rTestCases 15
 
 rTestCases :: Int -> Gen TestCase
-rTestCases n = do
-  c1 <- frequency subCase
-  c2 <- frequency subCase
-  return TestCase { testName = testName c1 ++ testName c2
-                  , testInput = testInput c1 ++ testInput c2
-                  , testResult =
-                      let (r1,t1) = testResult c1
-                          (r2,t2) = testResult c2
-                      in (r1+r2,t1+t2)
-                  , testProgram = \tick -> do
-                      r1 <- testProgram c1 tick
-                      r2 <- testProgram c2 tick
-                      return (r1 + r2)
-                  }
+rTestCases n = frequency $ subCase n
   where
-    subCase :: [(Int,Gen TestCase)]
-    subCase = [(2,rAsk),
-               (2,rTick),
-               (1,rIO),
-               (1,rRet),
-               (n,rTestCases $ n - 1)]
+    subCase :: Int -> [(Int,Gen TestCase)]
+    subCase n = [ (2, rAsk)
+                , (2, rTick)
+                , (1, rIO)
+                , (1, rRet)
+                , (1, rCut (n - 1))
+                , (n, rBind (n - 1))]
+    -- | Representing cut
+    rCut :: Int -> Gen TestCase
+    rCut n = do
+      c <- rTestCases n
+      return TestCase { testName = "(c" ++ testName c ++ ")"
+                      , testInput = testInput c
+                      , testResult = testResult c
+                      , testProgram = \tick -> cut $ testProgram c tick
+                      }
+    -- | Representing binds
+    rBind :: Int -> Gen TestCase
+    rBind n = do
+      c1 <- rTestCases n 
+      c2 <- rTestCases n
+      return TestCase { testName = testName c1 ++ testName c2
+                      , testInput = testInput c1 ++ testInput c2
+                      , testResult =
+                        let (r1,t1) = testResult c1
+                            (r2,t2) = testResult c2
+                        in (r1+r2,t1+t2)
+                      , testProgram = \tick -> do
+                          r1 <- testProgram c1 tick
+                          r2 <- testProgram c2 tick
+                          return (r1 + r2)
+                  }
+  
     -- | Representing questions and answers from user
     rAsk :: Gen TestCase
     rAsk = do
