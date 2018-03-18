@@ -6,6 +6,7 @@ module Replay(
   -- * Derived
   , io
   , ask
+  , cut
   , addAnswer
   , emptyTrace  
   -- * Run
