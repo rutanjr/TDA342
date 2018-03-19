@@ -1,7 +1,8 @@
 module Main where
 
 import Data.IORef
-import Replay
+import Control.Monad.State hiding (state)
+import ReplayState 
 import System.Exit
 import Test.QuickCheck hiding (Result)
 
@@ -15,7 +16,7 @@ main = do
 
 -- | Programs are parameterised over a 'tick' action.
 --   Questions are () and answers are integers.
-type Program = IO () -> Replay () Int Int
+type Program = State Int () -> ReplayState Int () Int Int
 
 -- | A result is a pair of the final result of the program
 --   and the number of 'ticks' executed.
@@ -32,16 +33,12 @@ data TestCase = TestCase
   }
 
 -- | Running a program.
-runProgram :: Program -> Input -> IO Result
-runProgram p inp = do
-    counter <- newIORef 0
-    let tick = modifyIORef counter (+1)
-    x <- play (p tick) emptyTrace inp
-    n <- readIORef counter
-    return (x, n)
+runProgram :: Program -> Input -> Result
+runProgram p inp = runState (play (p tick) emptyTrace inp) 0
   where
+    tick = modify (+1)
     play prog t inp = do
-      r <- run prog t
+      r <- runReplayState prog t
       case r of
         Right x      -> return x
         Left (_, t') -> case inp of
@@ -51,9 +48,8 @@ runProgram p inp = do
 -- | Checking a test case. Compares expected and actual results.
 checkTestCase :: TestCase -> IO Bool
 checkTestCase test@(TestCase name i r p) = do
-  --putStr $ name ++ ": "
   putStr $ show test ++ ": "
-  r' <- runProgram p i
+  let r' = runProgram p i
   if r == r'
     then putStrLn "ok" >> return True
     else putStrLn ("FAIL: expected " ++ show r ++
@@ -68,9 +64,9 @@ testCases =
     , testInput   = [3,4]
     , testResult  = (8, 1)
     , testProgram = \tick -> do
-        io tick
+        state tick
         a <- ask () -- should be 3
-        b <- io (return 1)
+        b <- state (return 1)
         c <- ask () -- should be 4
         return (a + b + c)
     } ,
@@ -82,13 +78,21 @@ testCases =
     , testProgram = \tick -> do
         cut (return 0)
     } ,
+    -- Testing weird cut
+    TestCase
+    { testName  = "test_cut_inner"
+    , testInput = [2]
+    , testResult = (2,0)
+    , testProgram = \tick -> do
+        cut (cut (return 1) >> ask ())
+    } ,
     -- Testing a single return and empty trace
     TestCase
     { testName    = "test_return"
     , testInput   = []
     , testResult  = (0,0)
     , testProgram = \tick -> do
-        io (return 0)
+        state (return 0)
     } ,
     -- Testing that extra input is ignored
     TestCase
@@ -105,8 +109,8 @@ testCases =
     { testName    = "test_bind_assoc"
     , testInput   = [0,1,0]
     , testResult  = (1,2)
-    , testProgram = \tick -> ((ask () >> io tick) >> ask ()) >>=
-                             (\a -> (io tick >> ask () >>= return (return a)))
+    , testProgram = \tick -> ((ask () >> state tick) >> ask ()) >>=
+                             (\a -> (state tick >> ask () >>= return (return a)))
     } ,
     -- Testing right identity of monads
     TestCase
@@ -146,7 +150,7 @@ rTestCases n = frequency $ subCase n
     subCase :: Int -> [(Int,Gen TestCase)]
     subCase n = [ (2, rAsk)
                 , (2, rTick)
-                , (1, rIO)
+                , (1, rState)
                 , (1, rRet)
                 , (1, rCut (n - 1))
                 , (n, rBind (n - 1))]
@@ -185,22 +189,22 @@ rTestCases n = frequency $ subCase n
                       , testResult = (i,0)
                       , testProgram = \tick -> ask ()
                       }
-    -- | Representing IO actions with only side effects
+    -- | Representing State actions with only side effects
     rTick :: Gen TestCase
     rTick = do
       return TestCase { testName = "t"
                       , testInput = []
                       , testResult = (0,1)
-                      , testProgram = \tick -> io tick >> return 0
+                      , testProgram = \tick -> state tick >> return 0
                       }
-    -- | Representing IO actions with only return values
-    rIO :: Gen TestCase
-    rIO = do
+    -- | Representing State actions with only return values
+    rState :: Gen TestCase
+    rState = do
       n <- fmap abs arbitrary
-      return TestCase { testName = "i"
+      return TestCase { testName = "s"
                       , testInput = []
                       , testResult = (n,0)
-                      , testProgram = \tick -> io (return n)
+                      , testProgram = \tick -> state (return n)
                       }
     -- | Representing monad returns
     rRet :: Gen TestCase

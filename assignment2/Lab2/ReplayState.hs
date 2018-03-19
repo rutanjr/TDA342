@@ -1,8 +1,21 @@
 -- | Replay program using state as the lower level monad
-module ReplayState where
+module ReplayState(
+  -- * Types
+  ReplayT, ReplayState, Trace, Item (Result,Answer)
+  -- * Derived
+  , state
+  , ask
+  , cut
+  , addAnswer
+  , emptyTrace  
+  -- * Run
+  , run
+  , runReplayState
+  , liftR
+  ) where
 
 import ReplayT
-import Control.Monad.State
+import Control.Monad.State hiding (state)
 
 -- * Type
 --------------------------------------------------------------------------------
